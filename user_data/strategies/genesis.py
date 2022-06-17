@@ -57,7 +57,7 @@ class Genesis(IStrategy):
     # trailing_stop_positive_offset = 0.0  # Disabled / not configured
 
     # Optimal timeframe for the strategy.
-    timeframe = '5m'
+    timeframe = '30m'
 
     # Run "populate_indicators()" only for new candle.
     process_only_new_candles = True
@@ -95,6 +95,10 @@ class Genesis(IStrategy):
 
     plot_config = {
         'main_plot': {
+                'bb_upperband': {'color': 'blue'},
+                'bb_lowerband': {'color': 'red'},
+                'bb_middleband': {'color': 'yellow'},
+
         },
         'subplots': {
             "DI": {
@@ -104,6 +108,11 @@ class Genesis(IStrategy):
             "AROON": {
                 'aroonosc': {'color': 'orange'}
             },
+
+            "RSI": {
+                'rsi': {'color': 'purple'},
+            },
+
         }
     }
 
@@ -175,7 +184,7 @@ class Genesis(IStrategy):
         # dataframe['cci'] = ta.CCI(dataframe)
 
         # RSI
-        dataframe['rsi'] = ta.RSI(dataframe)
+        dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
 
         # # Inverse Fisher transform on RSI: values [-1.0, 1.0] (https://goo.gl/2JGGoy)
         # rsi = 0.1 * (dataframe['rsi'] - 50)
@@ -218,9 +227,9 @@ class Genesis(IStrategy):
 
         # Bollinger Bands
         bollinger = qtpylib.bollinger_bands(qtpylib.typical_price(dataframe), window=20, stds=2)
-        # dataframe['bb_lowerband'] = bollinger['lower']
+        dataframe['bb_lowerband'] = bollinger['lower']
         dataframe['bb_middleband'] = bollinger['mid']
-        # dataframe['bb_upperband'] = bollinger['upper']
+        dataframe['bb_upperband'] = bollinger['upper']
         # dataframe["bb_percent"] = (
         #     (dataframe["close"] - dataframe["bb_lowerband"]) /
         #     (dataframe["bb_upperband"] - dataframe["bb_lowerband"])
@@ -255,6 +264,7 @@ class Genesis(IStrategy):
 
         # # SMA - Simple Moving Average
         # dataframe['sma3'] = ta.SMA(dataframe, timeperiod=3)
+        dataframe['sma14'] = ta.SMA(dataframe, timeperiod=14)
         # dataframe['sma5'] = ta.SMA(dataframe, timeperiod=5)
         # dataframe['sma10'] = ta.SMA(dataframe, timeperiod=10)
         # dataframe['sma21'] = ta.SMA(dataframe, timeperiod=21)
@@ -350,8 +360,8 @@ class Genesis(IStrategy):
         """
         dataframe.loc[
             (
-                # (Plus DI) - (Minus DI) > 25
-                (dataframe['plus_di'] - dataframe['minus_di'] > 25) &
+                # BB middle, cross from below
+                ( - dataframe['minus_di'] > 25) &
 
                 # Aroon oscilator crosses -80 from below
                 (qtpylib.crossed_above(dataframe['aroonosc'], -80)) &
@@ -359,6 +369,20 @@ class Genesis(IStrategy):
                 (dataframe['volume'] > 0)
             ),
             'enter_long'] = 1
+
+            # VERSION 1
+            # (
+            #     # (Plus DI) - (Minus DI) > 25
+            #     (dataframe['plus_di'] - dataframe['minus_di'] > 25) &
+
+            #     # Aroon oscilator crosses -80 from below
+            #     (qtpylib.crossed_above(dataframe['aroonosc'], -80)) &
+            #     # (dataframe['ao'])
+            #     (dataframe['volume'] > 0)
+            # ),
+            # 'enter_long'] = 1
+
+
 
 
                 #

@@ -43,7 +43,7 @@ class Genesis(IStrategy):
     # Minimal ROI designed for the strategy.
     # This attribute will be overridden if the config file contains "minimal_roi".
     minimal_roi = {
-        "0": 0.01
+        "0": 0.9
     }
 
     # Optimal stoploss designed for the strategy.
@@ -101,9 +101,9 @@ class Genesis(IStrategy):
 
         },
         'subplots': {
-            "DI": {
-                'plus_di': {'color': 'blue'},
-                'minus_di': {'color': 'red'}
+            "Hilberto": {
+                'htleadsine': {'color': 'blue'},
+                'htsine': {'color': 'red'}
             },
             "AROON": {
                 'aroonosc': {'color': 'orange'}
@@ -111,6 +111,10 @@ class Genesis(IStrategy):
 
             "RSI": {
                 'rsi': {'color': 'purple'},
+            },
+
+            "MACD": {
+                'macd': {'color': 'black'},
             },
 
         }
@@ -140,6 +144,10 @@ class Genesis(IStrategy):
         :param metadata: Additional information, like the currently traded pair
         :return: a Dataframe with all mandatory indicators for the strategies
         """
+
+
+
+
 
         # Momentum Indicators
         # ------------------------------------
@@ -211,10 +219,10 @@ class Genesis(IStrategy):
         # dataframe['fastk_rsi'] = stoch_rsi['fastk']
 
         # MACD
-        # macd = ta.MACD(dataframe)
-        # dataframe['macd'] = macd['macd']
-        # dataframe['macdsignal'] = macd['macdsignal']
-        # dataframe['macdhist'] = macd['macdhist']
+        macd = ta.MACD(dataframe)
+        dataframe['macd'] = macd['macd']
+        dataframe['macdsignal'] = macd['macdsignal']
+        dataframe['macdhist'] = macd['macdhist']
 
         # MFI
         # dataframe['mfi'] = ta.MFI(dataframe)
@@ -280,9 +288,9 @@ class Genesis(IStrategy):
         # Cycle Indicator
         # ------------------------------------
         # Hilbert Transform Indicator - SineWave
-        # hilbert = ta.HT_SINE(dataframe)
-        # dataframe['htsine'] = hilbert['sine']
-        # dataframe['htleadsine'] = hilbert['leadsine']
+        hilbert = ta.HT_SINE(dataframe)
+        dataframe['htsine'] = hilbert['sine']
+        dataframe['htleadsine'] = hilbert['leadsine']
 
         # Pattern Recognition - Bullish candlestick patterns
         # ------------------------------------
@@ -349,6 +357,21 @@ class Genesis(IStrategy):
                 dataframe['best_ask'] = ob['asks'][0][0]
         """
 
+
+        # Custom
+
+        # Inverted hammer
+        dataframe['inverted_hammer_bullish'] = \
+            (abs(dataframe['open'] * 100 / dataframe['low'] - 100) < 0.05) & \
+            (dataframe['open'] < dataframe['close'])
+
+        # Bearish cricket bat
+        dataframe['cricket_bat_bearish'] = \
+            (abs(dataframe['open'] * 100 / dataframe['high'] - 100) < 0.02) & \
+            (abs(dataframe['open'] * 100 / dataframe['close'] - 100) > 0.03) & \
+            (dataframe['open'] > dataframe['close'])
+
+
         return dataframe
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -360,16 +383,61 @@ class Genesis(IStrategy):
         """
         dataframe.loc[
             (
-                # BB middle, cross from below
-                ( - dataframe['minus_di'] > 25) &
+                # Candle below lower BB
+                (dataframe['low'] < dataframe['bb_lowerband']) &
 
-                # Aroon oscilator crosses -80 from below
-                (qtpylib.crossed_above(dataframe['aroonosc'], -80)) &
-                # (dataframe['ao'])
+                # RSI < 30
+                (dataframe['rsi'] < 30 ) &
+                
+                # Aroon osc < -30
+                (dataframe['aroonosc'] < -30 ) &
+
+                # Hilbert lead over std
+                (dataframe['htleadsine'] > dataframe['htsine']) &
+                
+                # Bullish candle or Bearish cricket bat
+                ((dataframe['open'] < dataframe['close']) | (dataframe['cricket_bat_bearish'])) &
+
+                # Volume not 0 
                 (dataframe['volume'] > 0)
-            ),
-            'enter_long'] = 1
 
+                # BB lower, cross from below
+                # (dataframe['close'].shift(2) < dataframe['bb_lowerband']) &
+                # (dataframe['low'].shift(1) < dataframe['bb_lowerband']) &
+
+                # Minus di descendant
+                # (dataframe['minus_di'].shift(1) > dataframe['minus_di']) &
+
+                # Aroon osc ascendant
+                # (dataframe['aroonosc'].shift(1) < dataframe['aroonosc']) &
+                
+                # (dataframe['htleadsine'].shift(1) > dataframe['htleadsine'])&
+                # (dataframe['htsine'].shift(1) < dataframe['htsine'])&
+                # (dataframe['htleadsine'] - dataframe['htsine'] <= 0.05)
+
+                
+
+            ),
+            ['enter_long', 'enter_tag']] = (1, 'minor_low')
+
+
+        dataframe.loc[
+            (
+
+                # (dataframe['macd'] < -12) &
+                # # Volume not 0 
+                # (dataframe['volume'] > 0)
+
+
+            ),
+
+
+
+
+
+
+            ['enter_long', 'enter_tag']] = (1, 'dump')
+            
             # VERSION 1
             # (
             #     # (Plus DI) - (Minus DI) > 25
@@ -412,14 +480,42 @@ class Genesis(IStrategy):
         :param metadata: Additional information, like the currently traded pair
         :return: DataFrame with exit columns populated
         """
+
+        # Correction
         dataframe.loc[
             (
-                # Signal: RSI crosses above 70
-                (qtpylib.crossed_below(dataframe['rsi'], 70)) &
+                # RSI crosses above 70
+                (dataframe['rsi'] >= 70) &
+                
+                # Aroon above 80 and ascendant
+                
+                (dataframe['aroonosc'] >= 70) &
+                (dataframe['aroonosc'].shift(1) > dataframe['aroonosc']) &
+                (dataframe['aroonosc'].shift(1) +  dataframe['aroonosc'] <= 175) &
+                
+                (dataframe['htleadsine'] < dataframe['htsine']) &
+                
+                # BB upper above
+                (dataframe['high'] > dataframe['bb_upperband']) &
+                (dataframe['high'].shift(1) > dataframe['bb_upperband']).shift(1) &
+
                 (dataframe['volume'] > 0)  # Make sure Volume is not 0
             ),
 
-            'exit_long'] = 1
+            ['exit_long', 'exit_tag']] = (1, 'correction')
+
+        # Downhill 
+        dataframe.loc[
+            (
+                # (dataframe['macd'] < -80) &
+                
+                # # Make sure Volume is not 0
+                # (dataframe['volume'] > 0)  
+            ),
+
+            ['exit_long', 'exit_tag']] = (1, 'downhill')
+
+
 
         # dataframe.loc[
         #     (

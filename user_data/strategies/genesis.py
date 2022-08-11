@@ -2,6 +2,7 @@
 # flake8: noqa: F401
 # isort: skip_file
 # --- Do not remove these libs ---
+from json import load
 import numpy as np  # noqa
 import pandas as pd  # noqa
 from pandas import DataFrame
@@ -43,12 +44,12 @@ class Genesis(IStrategy):
     # Minimal ROI designed for the strategy.
     # This attribute will be overridden if the config file contains "minimal_roi".
     minimal_roi = {
-        "0": 0.9
+        "0": 0.1
     }
 
     # Optimal stoploss designed for the strategy.
     # This attribute will be overridden if the config file contains "stoploss".
-    stoploss = -0.02
+    stoploss = -0.05
 
     # Trailing stoploss
     trailing_stop = False
@@ -97,8 +98,6 @@ class Genesis(IStrategy):
         'main_plot': {
                 'bb_upperband': {'color': 'blue'},
                 'bb_lowerband': {'color': 'red'},
-                'bb_middleband': {'color': 'yellow'},
-
         },
         'subplots': {
             "Hilberto": {
@@ -360,17 +359,43 @@ class Genesis(IStrategy):
 
         # Custom
 
-        # Inverted hammer
+        # Inverted hammer UNF
         dataframe['inverted_hammer_bullish'] = \
             (abs(dataframe['open'] * 100 / dataframe['low'] - 100) < 0.05) & \
             (dataframe['open'] < dataframe['close'])
 
-        # Bearish cricket bat
+        # Bearish cricket bat UNF
         dataframe['cricket_bat_bearish'] = \
             (abs(dataframe['open'] * 100 / dataframe['high'] - 100) < 0.02) & \
             (abs(dataframe['open'] * 100 / dataframe['close'] - 100) > 0.03) & \
             (dataframe['open'] > dataframe['close'])
+        
+        # -3% Bearish candle UNF
+        dataframe['-3%_bearish_candle'] = \
+            (dataframe['open'] > dataframe['close']) & \
+            (dataframe['close'] / dataframe['open'] <= 0.97)
 
+        # Bearish hammer UNF
+        dataframe['candle_bearish_hammer'] = \
+            (dataframe['open'] > dataframe['close']) & \
+            (dataframe['open'] / dataframe['close'] -1 >= 0.003) & \
+            ((dataframe['open'] - dataframe['close']) * 2 < (dataframe['close'] - dataframe['low'])) 
+            
+        # Bullish hammer
+            # - Bullish
+            # - Head bigger than body
+            # - Super small tail
+        dataframe['candle_bullish_inverted_hammer'] = \
+            (dataframe['open'] < dataframe['close']) & \
+            ((dataframe['close'] - dataframe['open']) < (dataframe['high'] - dataframe['close'])) & \
+            ((dataframe['open'] - dataframe['low']) < 3.5)
+            
+        # Bullish 3% candle 
+            # - Bullish
+            # - 3% open-close
+        dataframe['candle_bullish_3%'] = \
+            (dataframe['open'] < dataframe['close']) & \
+            (dataframe['close'] * 100 / dataframe['open'] > 103)
 
         return dataframe
 
@@ -383,20 +408,26 @@ class Genesis(IStrategy):
         """
         dataframe.loc[
             (
-                # Candle below lower BB
-                (dataframe['low'] < dataframe['bb_lowerband']) &
 
-                # RSI < 30
-                (dataframe['rsi'] < 30 ) &
-                
-                # Aroon osc < -30
-                (dataframe['aroonosc'] < -30 ) &
+                (self.huge_peak_bullish(dataframe=dataframe)) &
 
-                # Hilbert lead over std
-                (dataframe['htleadsine'] > dataframe['htsine']) &
+                # # Candle below lower BB
+                # (dataframe['low'] < dataframe['bb_lowerband']) &
+
+                # # RSI < 30
+                # (dataframe['rsi'] < 32.5 ) &
                 
-                # Bullish candle or Bearish cricket bat
-                ((dataframe['open'] < dataframe['close']) | (dataframe['cricket_bat_bearish'])) &
+                # # Aroon osc < -30
+                # (dataframe['aroonosc'] < -30 ) &
+
+                # # Hilbert lead over std
+                # (dataframe['htleadsine'] > dataframe['htsine']) &
+                
+                # # Bullish candle
+                # (dataframe['open'] < dataframe['close']) &
+                
+                # # Not an inverted hammer
+                # (~dataframe['candle_bullish_inverted_hammer']) &
 
                 # Volume not 0 
                 (dataframe['volume'] > 0)
@@ -408,8 +439,7 @@ class Genesis(IStrategy):
                 # Minus di descendant
                 # (dataframe['minus_di'].shift(1) > dataframe['minus_di']) &
 
-                # Aroon osc ascendant
-                # (dataframe['aroonosc'].shift(1) < dataframe['aroonosc']) &
+
                 
                 # (dataframe['htleadsine'].shift(1) > dataframe['htleadsine'])&
                 # (dataframe['htsine'].shift(1) < dataframe['htsine'])&
@@ -481,39 +511,71 @@ class Genesis(IStrategy):
         :return: DataFrame with exit columns populated
         """
 
-        # Correction
+        # Bearish candle
+        # dataframe.loc[
+        #     (
+        #         (dataframe['-3%_bearish_candle'])
+        #     ),
+
+        #     ['exit_long', 'exit_tag']] = (1, '-3%_bearish_candle')
+
+
+        # Minor high
         dataframe.loc[
             (
                 # RSI crosses above 70
                 (dataframe['rsi'] >= 70) &
                 
-                # Aroon above 80 and ascendant
-                
-                (dataframe['aroonosc'] >= 70) &
-                (dataframe['aroonosc'].shift(1) > dataframe['aroonosc']) &
-                (dataframe['aroonosc'].shift(1) +  dataframe['aroonosc'] <= 175) &
-                
                 (dataframe['htleadsine'] < dataframe['htsine']) &
                 
                 # BB upper above
                 (dataframe['high'] > dataframe['bb_upperband']) &
-                (dataframe['high'].shift(1) > dataframe['bb_upperband']).shift(1) &
+                (dataframe['high'].shift(1) > dataframe['bb_upperband'].shift(1)) &
+                (dataframe['high'].shift(2) > dataframe['bb_upperband'].shift(2)) &
+                
+                
+                (dataframe['open'] < dataframe['close']) & \
+                (dataframe['open'].shift(1) > dataframe['close'].shift(1)) & \
 
                 (dataframe['volume'] > 0)  # Make sure Volume is not 0
             ),
 
             ['exit_long', 'exit_tag']] = (1, 'correction')
 
-        # Downhill 
-        dataframe.loc[
-            (
-                # (dataframe['macd'] < -80) &
+        # dataframe.loc[
+        #     (
                 
-                # # Make sure Volume is not 0
-                # (dataframe['volume'] > 0)  
-            ),
+                
+        #         (dataframe['volume'] > 0)  # Make sure Volume is not 0
+        #     ),
 
-            ['exit_long', 'exit_tag']] = (1, 'downhill')
+        #     ['exit_long', 'exit_tag']] = (1, 'after_3%_rise')
+
+
+
+        # Inverted bullish hammer
+        # dataframe.loc[
+        #     (
+                
+        #         (dataframe['inverted_hammer_bullish']) &
+        #         (dataframe['high'] > dataframe['bb_upperband']) &
+        #         (dataframe['high'].shift(1) < dataframe['bb_upperband'].shift(1)) &
+
+        #         (dataframe['volume'] > 0)  # Make sure Volume is not 0
+        #     ),
+
+        #     ['exit_long', 'exit_tag']] = (1, 'inverted_hammer')
+
+        # # Downhill 
+        # dataframe.loc[
+        #     (
+        #         # (dataframe['macd'] < -80) &
+                
+        #         # # Make sure Volume is not 0
+        #         # (dataframe['volume'] > 0)  
+        #     ),
+
+        #     ['exit_long', 'exit_tag']] = (1, 'downhill')
 
 
 
@@ -529,3 +591,34 @@ class Genesis(IStrategy):
         #     'exit_short'] = 1
 
         return dataframe
+
+    # Support methods
+    def huge_peak_bullish(self, dataframe: DataFrame):
+        return (
+                # Aroon osc on previous candle is -100
+                (dataframe['aroonosc'].shift(1) < -70) &
+
+                # Bullish candle
+                (dataframe['open'] < dataframe['close']) &
+
+                # Candle with high above lower BB
+                (dataframe['high'] > dataframe['bb_lowerband']) &
+
+                # Prior 4 candles bearish
+                (dataframe['open'].shift(1) > dataframe['close'].shift(1)) &
+                (dataframe['open'].shift(2) > dataframe['close'].shift(2)) &
+                (dataframe['open'].shift(3) > dataframe['close'].shift(3)) &
+                (dataframe['open'].shift(4) > dataframe['close'].shift(4)) &
+
+                # Prior 4 candles lows below BB
+                (dataframe['low'].shift(1) < dataframe['bb_lowerband'].shift(1)) &
+                (dataframe['low'].shift(2) < dataframe['bb_lowerband'].shift(2)) &
+                (dataframe['low'].shift(3) < dataframe['bb_lowerband'].shift(3)) &
+                (dataframe['low'].shift(4) < dataframe['bb_lowerband'].shift(4)) &
+
+                # RSI below 30
+                (dataframe['rsi'] < 30) &
+
+                # Downhill heavier than 3.5%
+                (((1 - dataframe['low'].shift(1) / dataframe['high'].shift(4)) * 100) > 3.5)
+        )

@@ -1,0 +1,13 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\user_data",
+    "\\user_data\\data",
+    "\\user_data\\data\\binance",
+    "\\user_data\\data\\binance\\futures",
+    "\\user_data\\plot",
+    "\\user_data\\strategies"
+  ],
+  "SelectedNode": "\\user_data\\plot\\freqtrade-plot-ETH_USDT-1m.html",
+  "PreviewInSolutionExplorer": true
+}

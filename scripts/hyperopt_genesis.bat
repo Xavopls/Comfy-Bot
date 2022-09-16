@@ -1,0 +1,1 @@
+freqtrade hyperopt --config user_data/config.json --hyperopt-loss ShortTradeDurHyperOptLoss --strategy Genesis -e 200 --spaces buy roi stoploss

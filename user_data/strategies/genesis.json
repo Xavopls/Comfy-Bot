@@ -1,0 +1,39 @@
+{
+  "strategy_name": "Genesis",
+  "params": {
+    "trailing": {
+      "trailing_stop": false,
+      "trailing_stop_positive": null,
+      "trailing_stop_positive_offset": 0.0,
+      "trailing_only_offset_is_reached": false
+    },
+    "buy": {
+      "buy_ema5_enabled": true,
+      "buy_low_bb_enabled": true,
+      "buy_low_bb_error": -3,
+      "buy_macd": -2.9,
+      "buy_macd_enabled": true,
+      "buy_rsi": 36,
+      "buy_rsi_enabled": false
+    },
+    "sell": {
+      "sell_macd": -3,
+      "sell_rsi": 70,
+      "sell_rsi_enabled": true,
+      "sell_upper_bb_enabled": true,
+      "sell_upper_bb_error": 0
+    },
+    "protection": {},
+    "roi": {
+      "0": 0.056999999999999995,
+      "7": 0.02,
+      "10": 0.01,
+      "16": 0
+    },
+    "stoploss": {
+      "stoploss": -0.02
+    }
+  },
+  "ft_stratparam_v": 1,
+  "export_time": "2022-09-14 18:54:37.344556+00:00"
+}

@@ -1,39 +1,38 @@
 {
   "strategy_name": "Genesis",
   "params": {
-    "trailing": {
-      "trailing_stop": false,
-      "trailing_stop_positive": null,
-      "trailing_stop_positive_offset": 0.0,
-      "trailing_only_offset_is_reached": false
+    "roi": {
+      "0": 100,
+    },
+    "stoploss": {
+      "stoploss": -0.02
     },
     "buy": {
-      "buy_ema5_enabled": true,
+      "buy_bb_width_percentage": 0.031,
+      "buy_ema5_enabled": false,
       "buy_low_bb_enabled": true,
-      "buy_low_bb_error": -3,
-      "buy_macd": -2.9,
-      "buy_macd_enabled": true,
-      "buy_rsi": 36,
-      "buy_rsi_enabled": false
+      "buy_low_bb_error": 0,
+      "buy_macd": 0.5,
+      "buy_macd_enabled": false,
+      "buy_rsi": 33.1,
+      "buy_rsi_enabled": true
     },
     "sell": {
-      "sell_macd": -3,
-      "sell_rsi": 70,
+      "sell_informative_5m_bb_upperband": true,
+      "sell_macd": 3.0,
+      "sell_rsi": 77.3,
       "sell_rsi_enabled": true,
       "sell_upper_bb_enabled": true,
       "sell_upper_bb_error": 0
     },
     "protection": {},
-    "roi": {
-      "0": 0.056999999999999995,
-      "7": 0.02,
-      "10": 0.01,
-      "16": 0
-    },
-    "stoploss": {
-      "stoploss": -0.02
+    "trailing": {
+      "trailing_stop": true,
+      "trailing_stop_positive": 0.255,
+      "trailing_stop_positive_offset": 0.267,
+      "trailing_only_offset_is_reached": true
     }
   },
   "ft_stratparam_v": 1,
-  "export_time": "2022-09-14 18:54:37.344556+00:00"
+  "export_time": "2022-09-19 15:05:26.233821+00:00"
 }

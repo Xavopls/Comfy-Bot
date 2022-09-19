@@ -9,7 +9,7 @@ import pandas as pd  # noqa
 from pandas import DataFrame
 
 from freqtrade.strategy import (BooleanParameter, CategoricalParameter, DecimalParameter,
-                                IStrategy, IntParameter)
+                                IStrategy, IntParameter, informative, merge_informative_pair)
 
 # --------------------------------
 # Add your lib to import here
@@ -45,21 +45,18 @@ class Genesis(IStrategy):
     # Minimal ROI designed for the strategy.
     # This attribute will be overridden if the config file contains "minimal_roi".
     minimal_roi = {
-        "0": 0.097,
-        "4": 0.038,
-        "7": 0.013,
-        "14": 0
+        "0": 100,
     }
 
     # Optimal stoploss designed for the strategy.
     # This attribute will be overridden if the config file contains "stoploss".
-    stoploss = -0.075
+    stoploss = -0.02
 
     # Trailing stoploss
-    trailing_stop = False
-    # trailing_only_offset_is_reached = False
-    # trailing_stop_positive = 0.01
-    # trailing_stop_positive_offset = 0.0  # Disabled / not configured
+    trailing_stop = True
+    trailing_only_offset_is_reached = False
+    trailing_stop_positive = 0.01
+    trailing_stop_positive_offset = 0.0  # Disabled / not configured
 
     # Optimal timeframe for the strategy.
     timeframe = '1m'
@@ -72,19 +69,45 @@ class Genesis(IStrategy):
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
 
+    # @property
+    # def protections(self):
+    #     return [
+    #         {
+    #             "method": "StoplossGuard",
+    #             "lookback_period_candles": 24,
+    #             "trade_limit": 4,
+    #             "stop_duration_candles": 4,
+    #             "required_profit": 0.0,
+    #             "only_per_pair": False,
+    #             "only_per_side": False
+    #         }
+    #     ]
+
+    @informative('5m')
+    def populate_indicators_5m(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        bollinger = qtpylib.bollinger_bands(qtpylib.typical_price(dataframe), window=20, stds=2)
+        dataframe['bb_upperband'] = bollinger['upper']
+        return dataframe
+
     # Hyperoptable parameters
 
     # Bollinger bands
+    buy_bb_width_percentage = DecimalParameter(low=0.01, high=1, decimals=3, default=0.5, space='buy', optimize=True,
+                                               load=True)
     buy_low_bb_enabled = BooleanParameter(default=True, space="buy")
     buy_low_bb_error = IntParameter(low=-3, high=3, default=0, space='buy', optimize=True, load=True)
     sell_upper_bb_enabled = BooleanParameter(default=True, space="sell")
     sell_upper_bb_error = IntParameter(low=-3, high=3, default=0, space='sell', optimize=True, load=True)
 
+    # Informative Pairs
+    sell_informative_5m_bb_upperband = BooleanParameter(default=True, space='sell')
+
     # RSI
     buy_rsi_enabled = BooleanParameter(default=True, space='buy')
-    buy_rsi = IntParameter(low=10, high=50, default=30, space='buy', optimize=True, load=True)
+    buy_rsi = DecimalParameter(low=20, high=38, decimals=1, default=30, space='buy', optimize=True, load=True)
+
     sell_rsi_enabled = BooleanParameter(default=True, space='sell')
-    sell_rsi = IntParameter(low=60, high=70, default=70, space='sell', optimize=True, load=True)
+    sell_rsi = DecimalParameter(low=60, high=80, decimals=1, default=60, space='sell', optimize=True, load=True)
 
     # MACD
     buy_macd_enabled = BooleanParameter(default=True, space='buy')
@@ -93,7 +116,6 @@ class Genesis(IStrategy):
 
     # EMA
     buy_ema5_enabled = BooleanParameter(default=True, space='buy')
-
 
     # Number of candles the strategy requires before producing valid signals
     startup_candle_count: int = 30
@@ -112,16 +134,13 @@ class Genesis(IStrategy):
         'exit': 'gtc'
     }
 
-
-
-
     plot_config = {
         'main_plot': {
-                'bb_upperband': {'color': 'blue'},
-                'bb_lowerband': {'color': 'red'},
-                'ema5': {'color': 'yellow'},
-                'ema10': {'color': 'purple'},
-                'ema21': {'color': 'blue'}
+            'bb_upperband': {'color': 'blue'},
+            'bb_lowerband': {'color': 'red'},
+            # 'sma5': {'color': 'yellow'},
+            # 'sma8': {'color': 'purple'},
+            # 'sma13': {'color': 'blue'}
         },
         'subplots': {
             # "Hilberto": {
@@ -132,14 +151,14 @@ class Genesis(IStrategy):
             #     'aroonosc': {'color': 'orange'}
             # },
             #
-            # "RSI": {
-            #     'rsi': {'color': 'purple'},
-            #     'rsi_sma': {'color': 'yellow'},
-            # },
-            #
-            # "MACD": {
-            #     'macd': {'color': 'black'},
-            # },
+            "RSI": {
+                'rsi': {'color': 'purple'},
+                'rsi_sma': {'color': 'yellow'},
+            },
+
+            "MACD": {
+                'macd': {'color': 'black'},
+            },
 
             "MFI": {
                 'mfi': {'color': 'black'},
@@ -170,7 +189,13 @@ class Genesis(IStrategy):
                             ("BTC/USDT", "15m"),
                             ]
         """
-        return []
+        # get access to all pairs available in whitelist.
+        pairs = self.dp.current_whitelist()
+        # Assign tf to each pair, so they can be downloaded and cached for strategy.
+        # informative_pairs = [(pair, '5m') for pair in pairs]
+        informative_pairs = [("ETH/USDT", "5m")]
+
+        return informative_pairs
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
@@ -184,10 +209,6 @@ class Genesis(IStrategy):
         :return: a Dataframe with all mandatory indicators for the strategies
         """
 
-
-
-
-
         # Momentum Indicators
         # ------------------------------------
 
@@ -196,20 +217,20 @@ class Genesis(IStrategy):
 
         # # Plus Directional Indicator / Movement
         # dataframe['plus_dm'] = ta.PLUS_DM(dataframe)
-        dataframe['plus_di'] = ta.PLUS_DI(dataframe)
+        # dataframe['plus_di'] = ta.PLUS_DI(dataframe)
 
         # # Minus Directional Indicator / Movement
         # dataframe['minus_dm'] = ta.MINUS_DM(dataframe)
-        dataframe['minus_di'] = ta.MINUS_DI(dataframe)
+        # dataframe['minus_di'] = ta.MINUS_DI(dataframe)
 
         # # Aroon, Aroon Oscillator
-        aroon = ta.AROON(dataframe)
-        dataframe['aroonup'] = aroon['aroonup']
-        dataframe['aroondown'] = aroon['aroondown']
-        dataframe['aroonosc'] = ta.AROONOSC(dataframe)
+        # aroon = ta.AROON(dataframe)
+        # dataframe['aroonup'] = aroon['aroonup']
+        # dataframe['aroondown'] = aroon['aroondown']
+        # dataframe['aroonosc'] = ta.AROONOSC(dataframe)
 
         # # Awesome Oscillator
-        dataframe['ao'] = qtpylib.awesome_oscillator(dataframe)
+        # dataframe['ao'] = qtpylib.awesome_oscillator(dataframe)
 
         # # Keltner Channel
         # keltner = qtpylib.keltner_channel(dataframe)
@@ -277,6 +298,8 @@ class Genesis(IStrategy):
         dataframe['bb_lowerband'] = bollinger['lower']
         dataframe['bb_middleband'] = bollinger['mid']
         dataframe['bb_upperband'] = bollinger['upper']
+        dataframe['bb_width_percentage'] = ((dataframe['bb_lowerband'] / dataframe['bb_upperband']) - 1) * -100
+
         # dataframe["bb_percent"] = (
         #     (dataframe["close"] - dataframe["bb_lowerband"]) /
         #     (dataframe["bb_upperband"] - dataframe["bb_lowerband"])
@@ -302,18 +325,19 @@ class Genesis(IStrategy):
         # )
 
         # # EMA - Exponential Moving Average
-        dataframe['ema3'] = ta.EMA(dataframe, timeperiod=3)
-        dataframe['ema5'] = ta.EMA(dataframe, timeperiod=5)
-        dataframe['ema10'] = ta.EMA(dataframe, timeperiod=10)
-        dataframe['ema21'] = ta.EMA(dataframe, timeperiod=21)
+        # dataframe['ema3'] = ta.EMA(dataframe, timeperiod=3)
+        # dataframe['ema5'] = ta.EMA(dataframe, timeperiod=5)
+        # dataframe['ema10'] = ta.EMA(dataframe, timeperiod=10)
+        # dataframe['ema10'] = ta.EMA(dataframe, timeperiod=10)
+        # dataframe['ema21'] = ta.EMA(dataframe, timeperiod=21)
         # dataframe['ema50'] = ta.EMA(dataframe, timeperiod=50)
         # dataframe['ema100'] = ta.EMA(dataframe, timeperiod=100)
 
         # # SMA - Simple Moving Average
         # dataframe['sma3'] = ta.SMA(dataframe, timeperiod=3)
-        dataframe['sma14'] = ta.SMA(dataframe, timeperiod=14)
+        # dataframe['sma13'] = ta.SMA(dataframe, timeperiod=13)
         # dataframe['sma5'] = ta.SMA(dataframe, timeperiod=5)
-        # dataframe['sma10'] = ta.SMA(dataframe, timeperiod=10)
+        # dataframe['sma8'] = ta.SMA(dataframe, timeperiod=8)
         # dataframe['sma21'] = ta.SMA(dataframe, timeperiod=21)
         # dataframe['sma50'] = ta.SMA(dataframe, timeperiod=50)
         # dataframe['sma100'] = ta.SMA(dataframe, timeperiod=100)
@@ -396,35 +420,31 @@ class Genesis(IStrategy):
                 dataframe['best_ask'] = ob['asks'][0][0]
         """
 
-
         # Custom
 
         # Bullish Inverted hammer
-            # - Bullish
-            # - Head bigger than body
-            # - Super small tail < 3.5$
+        # - Bullish
+        # - Head bigger than body
+        # - Super tiny tail < 3.5$
         dataframe['candle_bullish_inverted_hammer'] = \
             (dataframe['open'] < dataframe['close']) & \
             ((dataframe['close'] - dataframe['open']) < (dataframe['high'] - dataframe['close'])) & \
             ((dataframe['open'] - dataframe['low']) < 3.5)
 
-
         # Hammer Bearish
-            # - Head inexistant
-            # - Tail > Body
-            # - Body > 0.3%
-            # - Open > Close
+        # - Head inexistant
+        # - Tail > Body
+        # - Body > 0.3%
+        # - Open > Close
         dataframe['candle_hammer_bearish'] = \
             (dataframe['high'] - dataframe['open'] < 1) & \
             (dataframe['close'] < dataframe['open']) & \
             ((1 - (dataframe['close'] / dataframe['open'])) > 0.003) & \
             ((dataframe['open'] - dataframe['close']) < (dataframe['close'] - dataframe['low']))
 
-
-            
-        # Bullish 3% candle 
-            # - Bullish
-            # - 3% open-close
+        # Bullish 3% candle
+        # - Bullish
+        # - 3% open-close
         dataframe['candle_bullish_3%'] = \
             (dataframe['open'] < dataframe['close']) & \
             (dataframe['close'] * 100 / dataframe['open'] > 103)
@@ -439,41 +459,30 @@ class Genesis(IStrategy):
         :return: DataFrame with entry columns populated
         """
         ########################### START HYPEROPT ###########################
-        # conditions = []
-        #
-        # # Bollinger bands
-        # if self.buy_low_bb_enabled.value:
-        #     conditions.append((dataframe['bb_lowerband'] + self.buy_low_bb_error.value) > dataframe['low'])
-        #
-        # # RSI
-        # if self.buy_rsi_enabled:
-        #     conditions.append(dataframe['rsi'] < self.buy_rsi.value)
-        #
-        # # EMA
-        # if self.buy_ema5_enabled.value:
-        #     conditions.append(dataframe['ema5'] > dataframe['high'])
-        #
-        # # MACD
-        # if self.buy_macd_enabled.value:
-        #     conditions.append(dataframe['macd'] < self.buy_macd.value)
-        #
-        #
-        # if conditions:
-        #     dataframe.loc[
-        #         reduce(lambda x, y: x & y, conditions),
-        #         'enter_long'] = 1
+        conditions = []
+
+        # Bollinger bands
+        conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
+        conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
+
+        # RSI
+        conditions.append(dataframe['rsi'] < self.buy_rsi.value)
+
+        conditions.append((dataframe['volume'] > 0))
+
+        if conditions:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions),
+                'enter_long'] = 1
         ########################### END HYPEROPT ###########################
-
-
-
 
         dataframe.loc[
             (
-                (dataframe['ema5'] > dataframe['high']) &
-                (dataframe['macd'] < -1)
+                # (dataframe['ema5'] > dataframe['high']) &
+                # (dataframe['macd'] < -1)
 
-                #(self.entry_strat_1(dataframe=dataframe)) &
-                #(self.entry_strat_max_mins(dataframe=dataframe)) &
+                # (self.entry_strat_1(dataframe=dataframe)) &
+                # (self.entry_strat_max_mins(dataframe=dataframe)) &
 
                 # Volume not 0
                 # (dataframe['volume'] > 0)
@@ -481,8 +490,6 @@ class Genesis(IStrategy):
             ),
             ['enter_long', 'enter_tag']] = (1, 'minor_low')
 
-
-       
         return dataframe
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -495,18 +502,18 @@ class Genesis(IStrategy):
 
         ########################### START HYPEROPT ###########################
 
+        conditions = []
 
-        # conditions = []
-        #
-        # conditions.append(self.sell_rsi.value > dataframe['rsi'])
-        # conditions.append(self.sell_macd.value > dataframe['macd'])
-        #
-        #
-        # if conditions:
-        #     dataframe.loc[
-        #         reduce(lambda x, y: x & y, conditions),
-        #         'exit_long'] = 1
+        conditions.append(self.sell_rsi.value < dataframe['rsi'])
+        conditions.append((dataframe['high'] > dataframe['bb_upperband']))
 
+        if self.sell_informative_5m_bb_upperband.value:
+            conditions.append((dataframe['high_5m'] > dataframe['bb_upperband_5m']))
+
+        if conditions:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions),
+                'exit_long'] = 1
 
         ########################### END HYPEROPT ###########################
 
@@ -524,65 +531,60 @@ class Genesis(IStrategy):
 
     # 1m methods
     def entry_strat_1(self, dataframe: DataFrame):
-        return(
-            (dataframe['rsi'] - dataframe['rsi'].shift(1) > 7.5) &
-            (dataframe['rsi'] < 42) &
-            (qtpylib.crossed_above(dataframe['rsi'], dataframe['rsi_sma']))
+        return (
+                (dataframe['rsi'] - dataframe['rsi'].shift(1) > 7.5) &
+                (dataframe['rsi'] < 42) &
+                (qtpylib.crossed_above(dataframe['rsi'], dataframe['rsi_sma']))
         )
 
     def entry_strat_max_mins(self, dataframe: DataFrame):
-        return(
-           (dataframe['low'] > dataframe['low'].shift(30).rolling(300).max().shift())
+        return (
+            (dataframe['low'] > dataframe['low'].shift(30).rolling(300).max().shift())
         )
 
     def exit_strat_1(self, dataframe: DataFrame):
-        return(
-           (qtpylib.crossed_above(dataframe['macd'], 0)) 
+        return (
+            (qtpylib.crossed_above(dataframe['macd'], 0))
         )
-
-
 
     # 5m methods
     def entry_test_bbs(self, dataframe: DataFrame):
-        return(
-            
-            # Bullish candle
-            #(dataframe['open'] < dataframe['close']) &
+        return (
 
+            # Bullish candle
+            # (dataframe['open'] < dataframe['close']) &
 
             # last candle low below lower BB
-            #(dataframe['low'].shift(1) < dataframe['bb_lowerband']) &
+            # (dataframe['low'].shift(1) < dataframe['bb_lowerband']) &
 
             ## Last candle bearish
-            #(dataframe['open'].shift(1) > dataframe['close'].shift(1)) &
+            # (dataframe['open'].shift(1) > dataframe['close'].shift(1)) &
 
             ## MACD above -4
-            #(dataframe['macd'] > -4)
+            # (dataframe['macd'] > -4)
 
             # rsi = 30
-            dataframe['rsi'] > 30
+                dataframe['rsi'] > 30
         )
 
     def exit_test(self, dataframe: DataFrame):
-        return(
+        return (
 
             # Bearish candle
-            #(dataframe['open'] > dataframe['close']) &
-            
+            # (dataframe['open'] > dataframe['close']) &
+
             # Last candle bullish
-            #(dataframe['open'].shift(1) < dataframe['close'].shift(1)) &
+            # (dataframe['open'].shift(1) < dataframe['close'].shift(1)) &
 
             # Candle above BB upperband
-            #(dataframe['high'] > dataframe['bb_upperband']) 
+            # (dataframe['high'] > dataframe['bb_upperband'])
 
-            
         )
-
 
     # 30m methods
     def huge_peak_bullish(self, dataframe: DataFrame):
         return (
-                # Aroon osc on previous candle is -100
+            # Aroon osc on previous candle is -100
                 (dataframe['aroonosc'].shift(1) < -70) &
 
                 # Bullish candle

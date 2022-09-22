@@ -1,0 +1,1 @@
+freqtrade download-data --timerange 20220101-20220920 --timeframes 1m 5m --config user_data/config.json --prepend --erase

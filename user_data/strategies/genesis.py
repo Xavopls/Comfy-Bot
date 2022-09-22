@@ -54,9 +54,9 @@ class Genesis(IStrategy):
 
     # Trailing stoploss
     trailing_stop = True
-    trailing_only_offset_is_reached = False
-    trailing_stop_positive = 0.01
-    trailing_stop_positive_offset = 0.0  # Disabled / not configured
+    trailing_only_offset_is_reached = True
+    trailing_stop_positive = 0.015
+    trailing_stop_positive_offset = 0.071  # Disabled / not configured
 
     # Optimal timeframe for the strategy.
     timeframe = '1m'
@@ -190,12 +190,12 @@ class Genesis(IStrategy):
                             ]
         """
         # get access to all pairs available in whitelist.
-        pairs = self.dp.current_whitelist()
+        # pairs = self.dp.current_whitelist()
         # Assign tf to each pair, so they can be downloaded and cached for strategy.
         # informative_pairs = [(pair, '5m') for pair in pairs]
-        informative_pairs = [("ETH/USDT", "5m")]
+        # informative_pairs = [("ETH/USDT", "5m")]
 
-        return informative_pairs
+        # return informative_pairs
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
@@ -462,30 +462,28 @@ class Genesis(IStrategy):
         conditions = []
 
         # Bollinger bands
-        conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
-        conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
-
-        # RSI
-        conditions.append(dataframe['rsi'] < self.buy_rsi.value)
-
-        conditions.append((dataframe['volume'] > 0))
-
-        if conditions:
-            dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                'enter_long'] = 1
+        # conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
+        # conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
+        #
+        # # RSI
+        # conditions.append(dataframe['rsi'] < self.buy_rsi.value)
+        #
+        # conditions.append((dataframe['volume'] > 0))
+        #
+        # if conditions:
+        #     dataframe.loc[
+        #         reduce(lambda x, y: x & y, conditions),
+        #         'enter_long'] = 1
         ########################### END HYPEROPT ###########################
 
         dataframe.loc[
             (
-                # (dataframe['ema5'] > dataframe['high']) &
-                # (dataframe['macd'] < -1)
-
-                # (self.entry_strat_1(dataframe=dataframe)) &
-                # (self.entry_strat_max_mins(dataframe=dataframe)) &
+                (dataframe['bb_width_percentage'] > 0.851) &
+                (dataframe['bb_lowerband'] > dataframe['low']) &
+                (dataframe['rsi'] < 21.3) &
 
                 # Volume not 0
-                # (dataframe['volume'] > 0)
+                (dataframe['volume'] > 0)
 
             ),
             ['enter_long', 'enter_tag']] = (1, 'minor_low')
@@ -502,28 +500,33 @@ class Genesis(IStrategy):
 
         ########################### START HYPEROPT ###########################
 
-        conditions = []
-
-        conditions.append(self.sell_rsi.value < dataframe['rsi'])
-        conditions.append((dataframe['high'] > dataframe['bb_upperband']))
-
-        if self.sell_informative_5m_bb_upperband.value:
-            conditions.append((dataframe['high_5m'] > dataframe['bb_upperband_5m']))
-
-        if conditions:
-            dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                'exit_long'] = 1
+        # conditions = []
+        #
+        # conditions.append(self.sell_rsi.value < dataframe['rsi'])
+        # conditions.append((dataframe['high'] > dataframe['bb_upperband']))
+        #
+        # if self.sell_informative_5m_bb_upperband.value:
+        #     conditions.append((dataframe['high_5m'] > dataframe['bb_upperband_5m']))
+        #
+        # if conditions:
+        #     dataframe.loc[
+        #         reduce(lambda x, y: x & y, conditions),
+        #         'exit_long'] = 1
 
         ########################### END HYPEROPT ###########################
 
-        # dataframe.loc[
-        #     (
-        #         (self.exit_strat_1(dataframe=dataframe)) &
-        #         (dataframe['volume'] < 0)  # Make sure Volume is not 0
-        #     ),
-        #
-        #     ['exit_long', 'exit_tag']] = (1, 'exit_1')
+        dataframe.loc[
+            (
+                (dataframe['rsi'] > 65.5) &
+                (dataframe['high'] > dataframe['bb_upperband']) &
+
+                (dataframe['high_5m'] > dataframe['bb_upperband_5m']) &
+
+
+                (dataframe['volume'] > 0)  # Make sure Volume is not 0
+            ),
+
+            ['exit_long', 'exit_tag']] = (1, 'exit_1')
 
         return dataframe
 

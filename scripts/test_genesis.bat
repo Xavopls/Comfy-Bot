@@ -1,2 +1,2 @@
 freqtrade backtesting --strategy Genesis
-freqtrade plot-dataframe -p ETH/USDT --strategy Genesis
+freqtrade plot-dataframe --config user_data/config.json --strategy Genesis

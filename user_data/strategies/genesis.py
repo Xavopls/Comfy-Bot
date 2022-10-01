@@ -1,3 +1,6 @@
+# ToDo:
+
+
 # pragma pylint: disable=missing-docstring, invalid-name, pointless-string-statement
 # flake8: noqa: F401
 # isort: skip_file
@@ -69,50 +72,63 @@ class Genesis(IStrategy):
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
 
-    # @property
-    # def protections(self):
-    #     return [
-    #         {
-    #             "method": "StoplossGuard",
-    #             "lookback_period_candles": 24,
-    #             "trade_limit": 4,
-    #             "stop_duration_candles": 4,
-    #             "required_profit": 0.0,
-    #             "only_per_pair": False,
-    #             "only_per_side": False
-    #         }
-    #     ]
-
     @informative('5m')
     def populate_indicators_5m(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         bollinger = qtpylib.bollinger_bands(qtpylib.typical_price(dataframe), window=20, stds=2)
         dataframe['bb_upperband'] = bollinger['upper']
         return dataframe
 
+    @property
+    def protections(self):
+        prot = []
+
+        if self.use_stop_protection.value:
+            prot.append({
+                "method": "StoplossGuard",
+                "lookback_period_candles": 24 * 3,
+                "trade_limit": self.trade_limit.value,
+                "stop_duration_candles": self.stop_duration.value,
+                "only_per_pair": False
+            })
+
+        return prot
+
     # Hyperoptable parameters
 
+    # Protections
+    use_stop_protection = BooleanParameter(default=True, space="protection", optimize=True)
+    trade_limit = IntParameter(low=2, high=4, default=2, space='protection', optimize=True, load=True)
+    stop_duration = IntParameter(low=10, high=60, default=10, space='protection', optimize=True, load=True)
+
+
     # Bollinger bands
-    buy_bb_width_percentage = DecimalParameter(low=0.01, high=1, decimals=3, default=0.5, space='buy', optimize=True,
-                                               load=True)
-    buy_low_bb_enabled = BooleanParameter(default=True, space="buy")
-    buy_low_bb_error = IntParameter(low=-3, high=3, default=0, space='buy', optimize=True, load=True)
+    buy_bb_width_percentage = DecimalParameter(low=0.01, high=1, decimals=3, default=0.5, space='buy', optimize=True, load=True)
+    sell_bb_width_percentage = DecimalParameter(low=0.01, high=1, decimals=3, default=0.5, space='sell', optimize=True, load=True)
+    # buy_low_bb_enabled = BooleanParameter(default=True, space="buy")
+    # buy_low_bb_error = IntParameter(low=-3, high=3, default=0, space='buy', optimize=True, load=True)
     sell_upper_bb_enabled = BooleanParameter(default=True, space="sell")
     sell_upper_bb_error = IntParameter(low=-3, high=3, default=0, space='sell', optimize=True, load=True)
 
     # Informative Pairs
     sell_informative_5m_bb_upperband = BooleanParameter(default=True, space='sell')
 
+    # MFI
+    buy_mfi_enabled = BooleanParameter(default=True, space='buy')
+    sell_mfi_enabled = BooleanParameter(default=True, space='sell')
+    buy_mfi = DecimalParameter(low=2, high=35, decimals=1, default=20, space='buy', optimize=True, load=True)
+    sell_mfi = DecimalParameter(low=70, high=100, decimals=1, default=20, space='sell', optimize=True, load=True)
+
     # RSI
     buy_rsi_enabled = BooleanParameter(default=True, space='buy')
     buy_rsi = DecimalParameter(low=20, high=38, decimals=1, default=30, space='buy', optimize=True, load=True)
 
     sell_rsi_enabled = BooleanParameter(default=True, space='sell')
-    sell_rsi = DecimalParameter(low=60, high=80, decimals=1, default=60, space='sell', optimize=True, load=True)
+    sell_rsi = DecimalParameter(low=50, high=90, decimals=1, default=60, space='sell', optimize=True, load=True)
 
     # MACD
     buy_macd_enabled = BooleanParameter(default=True, space='buy')
-    buy_macd = DecimalParameter(low=-6, high=1, decimals=1, default=-3, space='buy', optimize=True, load=True)
-    sell_macd = DecimalParameter(low=1, high=3, decimals=2, default=-3, space='sell', optimize=True, load=True)
+    buy_macd = DecimalParameter(low=-10, high=10, decimals=2, default=-3, space='buy', optimize=True, load=True)
+    sell_macd = DecimalParameter(low=0, high=15, decimals=2, default=-3, space='sell', optimize=True, load=True)
 
     # EMA
     buy_ema5_enabled = BooleanParameter(default=True, space='buy')
@@ -300,14 +316,6 @@ class Genesis(IStrategy):
         dataframe['bb_upperband'] = bollinger['upper']
         dataframe['bb_width_percentage'] = ((dataframe['bb_lowerband'] / dataframe['bb_upperband']) - 1) * -100
 
-        # dataframe["bb_percent"] = (
-        #     (dataframe["close"] - dataframe["bb_lowerband"]) /
-        #     (dataframe["bb_upperband"] - dataframe["bb_lowerband"])
-        # )
-        # dataframe["bb_width"] = (
-        #     (dataframe["bb_upperband"] - dataframe["bb_lowerband"]) / dataframe["bb_middleband"]
-        # )
-
         # Bollinger Bands - Weighted (EMA based instead of SMA)
         # weighted_bollinger = qtpylib.weighted_bollinger_bands(
         #     qtpylib.typical_price(dataframe), window=20, stds=2
@@ -462,31 +470,39 @@ class Genesis(IStrategy):
         conditions = []
 
         # Bollinger bands
-        # conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
-        # conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
-        #
-        # # RSI
-        # conditions.append(dataframe['rsi'] < self.buy_rsi.value)
-        #
-        # conditions.append((dataframe['volume'] > 0))
-        #
-        # if conditions:
-        #     dataframe.loc[
-        #         reduce(lambda x, y: x & y, conditions),
-        #         'enter_long'] = 1
+        conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
+        conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
+
+        # RSI
+        conditions.append(dataframe['rsi'] < self.buy_rsi.value)
+
+        # MACD
+        conditions.append(dataframe['macd'] < self.buy_macd.value)
+
+        # MFI
+        if self.buy_mfi_enabled:
+            conditions.append(dataframe['mfi'] < self.buy_mfi.value)
+
+        # Other
+        conditions.append((dataframe['volume'] > 0))
+
+        if conditions:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions),
+                'enter_long'] = 1
         ########################### END HYPEROPT ###########################
 
-        dataframe.loc[
-            (
-                (dataframe['bb_width_percentage'] > 0.851) &
-                (dataframe['bb_lowerband'] > dataframe['low']) &
-                (dataframe['rsi'] < 21.3) &
-
-                # Volume not 0
-                (dataframe['volume'] > 0)
-
-            ),
-            ['enter_long', 'enter_tag']] = (1, 'minor_low')
+        # dataframe.loc[
+        #     (
+        #         (dataframe['bb_width_percentage'] > 0.851) &
+        #         (dataframe['bb_lowerband'] > dataframe['low']) &
+        #         (dataframe['rsi'] < 21.3) &
+        #
+        #         # Volume not 0
+        #         (dataframe['volume'] > 0)
+        #
+        #     ),
+        #     ['enter_long', 'enter_tag']] = (1, 'minor_low')
 
         return dataframe
 
@@ -500,35 +516,44 @@ class Genesis(IStrategy):
 
         ########################### START HYPEROPT ###########################
 
-        # conditions = []
-        #
-        # conditions.append(self.sell_rsi.value < dataframe['rsi'])
-        # conditions.append((dataframe['high'] > dataframe['bb_upperband']))
-        #
-        # if self.sell_informative_5m_bb_upperband.value:
-        #     conditions.append((dataframe['high_5m'] > dataframe['bb_upperband_5m']))
-        #
-        # if conditions:
-        #     dataframe.loc[
-        #         reduce(lambda x, y: x & y, conditions),
-        #         'exit_long'] = 1
+        conditions = []
+
+        # Bollingers
+        conditions.append((dataframe['high'] > dataframe['bb_upperband']))
+        conditions.append((dataframe['high_5m'] > dataframe['bb_upperband_5m']))
+        conditions.append((dataframe['bb_width_percentage']) > self.sell_bb_width_percentage.value)
+
+        # RSI
+        conditions.append(dataframe['rsi'] > self.sell_rsi.value)
+
+        # MACD
+        conditions.append(dataframe['macd'] > self.sell_macd.value)
+
+        # MFI
+        if self.sell_mfi_enabled:
+            conditions.append(dataframe['mfi'] > self.sell_mfi.value)
+
+        if conditions:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions),
+                'exit_long'] = 1
 
         ########################### END HYPEROPT ###########################
 
-        dataframe.loc[
-            (
-                (dataframe['rsi'] > 65.5) &
-                (dataframe['high'] > dataframe['bb_upperband']) &
-
-                (dataframe['high_5m'] > dataframe['bb_upperband_5m']) &
-
-
-                (dataframe['volume'] > 0)  # Make sure Volume is not 0
-            ),
-
-            ['exit_long', 'exit_tag']] = (1, 'exit_1')
-
-        return dataframe
+        # dataframe.loc[
+        #     (
+        #         (dataframe['rsi'] > 65.5) &
+        #         (dataframe['high'] > dataframe['bb_upperband']) &
+        #
+        #         (dataframe['high_5m'] > dataframe['bb_upperband_5m']) &
+        #
+        #
+        #         (dataframe['volume'] > 0)  # Make sure Volume is not 0
+        #     ),
+        #
+        #     ['exit_long', 'exit_tag']] = (1, 'exit_1')
+        #
+        # return dataframe
 
     # Support methods
 

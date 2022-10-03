@@ -51,7 +51,7 @@ def test_setup_hyperopt_configuration_without_arguments(mocker, default_conf, ca
 
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', 'HyperoptableStrategy',
     ]
 
@@ -82,7 +82,7 @@ def test_setup_hyperopt_configuration_with_arguments(mocker, default_conf, caplo
 
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', 'HyperoptableStrategy',
         '--datadir', '/foo/bar',
         '--timeframe', '1m',
@@ -134,7 +134,7 @@ def test_setup_hyperopt_configuration_stake_amount(mocker, default_conf) -> None
 
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', 'HyperoptableStrategy',
         '--stake-amount', '1',
         '--starting-balance', '2'
@@ -144,7 +144,7 @@ def test_setup_hyperopt_configuration_stake_amount(mocker, default_conf) -> None
 
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
         '--stake-amount', '1',
         '--starting-balance', '0.5'
@@ -162,7 +162,7 @@ def test_start_not_installed(mocker, default_conf, import_fails) -> None:
 
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', 'HyperoptableStrategy',
         '--epochs', '5',
         '--hyperopt-loss', 'SharpeHyperOptLossDaily',
@@ -181,7 +181,7 @@ def test_start_no_hyperopt_allowed(mocker, hyperopt_conf, caplog) -> None:
 
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--hyperopt', 'HyperoptTestSepFile',
         '--hyperopt-loss', 'SharpeHyperOptLossDaily',
         '--epochs', '5'
@@ -203,7 +203,7 @@ def test_start_no_data(mocker, hyperopt_conf, tmpdir) -> None:
     patch_exchange(mocker)
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', 'HyperoptableStrategy',
         '--hyperopt-loss', 'SharpeHyperOptLossDaily',
         '--epochs', '5'
@@ -227,7 +227,7 @@ def test_start_filelock(mocker, hyperopt_conf, caplog) -> None:
 
     args = [
         'hyperopt',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', 'HyperoptableStrategy',
         '--hyperopt-loss', 'SharpeHyperOptLossDaily',
         '--epochs', '5'

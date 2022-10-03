@@ -15,7 +15,7 @@ from freqtrade.configuration import Configuration
 # Initialize empty configuration object
 config = Configuration.from_files([])
 # Optionally (recommended), use existing configuration file
-# config = Configuration.from_files(["config.json"])
+# config = Configuration.from_files(["config_test.json"])
 
 # Define some constants
 config["timeframe"] = "5m"
@@ -146,7 +146,7 @@ import plotly.express as px
 import pandas as pd
 
 # strategy = 'SampleStrategy'
-# config = Configuration.from_files(["user_data/config.json"])
+# config = Configuration.from_files(["user_data/config_test.json"])
 # backtest_dir = config["user_data_dir"] / "backtest_results"
 
 stats = load_backtest_stats(backtest_dir)

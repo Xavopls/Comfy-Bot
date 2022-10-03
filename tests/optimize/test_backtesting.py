@@ -147,7 +147,7 @@ def test_setup_optimize_configuration_without_arguments(mocker, default_conf, ca
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
         '--export', 'none'
     ]
@@ -182,7 +182,7 @@ def test_setup_bt_configuration_with_arguments(mocker, default_conf, caplog) -> 
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
         '--datadir', '/foo/bar',
         '--timeframe', '1m',
@@ -232,7 +232,7 @@ def test_setup_optimize_configuration_stake_amount(mocker, default_conf, caplog)
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
         '--stake-amount', '1',
         '--starting-balance', '2'
@@ -243,7 +243,7 @@ def test_setup_optimize_configuration_stake_amount(mocker, default_conf, caplog)
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
         '--stake-amount', '1',
         '--starting-balance', '0.5'
@@ -261,7 +261,7 @@ def test_start(mocker, fee, default_conf, caplog) -> None:
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
     ]
     pargs = get_args(args)
@@ -1155,7 +1155,7 @@ def test_backtest_start_timerange(default_conf, mocker, caplog, testdatadir):
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
         '--datadir', str(testdatadir),
         '--timeframe', '1m',
@@ -1224,7 +1224,7 @@ def test_backtest_start_multi_strat(default_conf, mocker, caplog, testdatadir):
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--strategy-path', str(Path(__file__).parents[1] / 'strategy/strats'),
         '--timeframe', '1m',
@@ -1340,7 +1340,7 @@ def test_backtest_start_multi_strat_nomock(default_conf, mocker, caplog, testdat
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--strategy-path', str(Path(__file__).parents[1] / 'strategy/strats'),
         '--timeframe', '1m',
@@ -1405,7 +1405,7 @@ def test_backtest_start_futures_noliq(default_conf_usdt, mocker,
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--strategy-path', str(Path(__file__).parents[1] / 'strategy/strats'),
         '--timeframe', '1h',
@@ -1497,7 +1497,7 @@ def test_backtest_start_nomock_futures(default_conf_usdt, mocker,
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--strategy-path', str(Path(__file__).parents[1] / 'strategy/strats'),
         '--timeframe', '1h',
@@ -1606,7 +1606,7 @@ def test_backtest_start_multi_strat_nomock_detail(default_conf, mocker,
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--strategy-path', str(Path(__file__).parents[1] / 'strategy/strats'),
         '--timeframe', '5m',
@@ -1705,7 +1705,7 @@ def test_backtest_start_multi_strat_caching(default_conf, mocker, caplog, testda
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--strategy-path', str(Path(__file__).parents[1] / 'strategy/strats'),
         '--timeframe', '1m',

@@ -83,7 +83,7 @@ To show only certain buy and sell tags in the displayed output, use the followin
 For example:
 
 ```bash
-freqtrade backtesting-analysis -c <config.json> --analysis-groups 0 2 --enter-reason-list enter_tag_a enter_tag_b --exit-reason-list roi custom_exit_tag_a stop_loss
+freqtrade backtesting-analysis -c <config_test.json> --analysis-groups 0 2 --enter-reason-list enter_tag_a enter_tag_b --exit-reason-list roi custom_exit_tag_a stop_loss
 ```
 
 ### Outputting signal candle indicators
@@ -94,7 +94,7 @@ indicators. To print out a column for a given set of indicators, use the `--indi
 option:
 
 ```bash
-freqtrade backtesting-analysis -c <config.json> --analysis-groups 0 2 --enter-reason-list enter_tag_a enter_tag_b --exit-reason-list roi custom_exit_tag_a stop_loss --indicator-list rsi rsi_1h bb_lowerband ema_9 macd macdsignal
+freqtrade backtesting-analysis -c <config_test.json> --analysis-groups 0 2 --enter-reason-list enter_tag_a enter_tag_b --exit-reason-list roi custom_exit_tag_a stop_loss --indicator-list rsi rsi_1h bb_lowerband ema_9 macd macdsignal
 ```
 
 The indicators have to be present in your strategy's main DataFrame (either for your main

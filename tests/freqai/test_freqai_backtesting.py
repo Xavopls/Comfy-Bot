@@ -23,7 +23,7 @@ def test_freqai_backtest_start_backtest_list(freqai_conf, mocker, testdatadir):
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--strategy-path', str(Path(__file__).parents[1] / 'strategy/strats'),
         '--timeframe', '1h',

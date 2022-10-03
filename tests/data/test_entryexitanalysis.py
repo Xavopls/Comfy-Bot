@@ -78,7 +78,7 @@ def test_backtest_analysis_nomock(default_conf, mocker, caplog, testdatadir, tmp
 
     args = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--user-data-dir', str(tmpdir),
         '--timeframe', '5m',
@@ -96,7 +96,7 @@ def test_backtest_analysis_nomock(default_conf, mocker, caplog, testdatadir, tmp
 
     base_args = [
         'backtesting-analysis',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--datadir', str(testdatadir),
         '--user-data-dir', str(tmpdir),
     ]

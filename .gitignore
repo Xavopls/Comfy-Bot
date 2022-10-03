@@ -6,6 +6,8 @@ config*.json
 logfile.txt
 
 user_data/config.json
+user_data/config_test.json
+user_data/config_prod.json
 user_data/strategy/sample_strategy.py
 user_data/notebooks
 user_data/models

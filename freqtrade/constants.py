@@ -8,7 +8,7 @@ from typing import List, Literal, Tuple
 from freqtrade.enums import CandleType
 
 
-DEFAULT_CONFIG = 'config.json'
+DEFAULT_CONFIG = 'config_test.json'
 DEFAULT_EXCHANGE = 'bittrex'
 PROCESS_THROTTLE_SECS = 5  # sec
 HYPEROPT_EPOCH = 100  # epochs

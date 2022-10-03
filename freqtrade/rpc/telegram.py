@@ -131,7 +131,7 @@ class Telegram(RPCHandler):
         # Create keys for generation
         valid_keys_print = [k.replace('$', '') for k in valid_keys]
 
-        # custom keyboard specified in config.json
+        # custom keyboard specified in config_test.json
         cust_keyboard = self._config['telegram'].get('keyboard', [])
         if cust_keyboard:
             combined = "(" + ")|(".join(valid_keys) + ")"

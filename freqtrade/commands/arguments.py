@@ -150,12 +150,12 @@ class Arguments:
             else:
                 # Default case
                 user_dir = 'user_data'
-                # Try loading from "user_data/config.json"
+                # Try loading from "user_data/config_test.json"
             cfgfile = Path(user_dir) / DEFAULT_CONFIG
             if cfgfile.is_file():
                 parsed_arg.config = [str(cfgfile)]
             else:
-                # Else use "config.json".
+                # Else use "config_test.json".
                 cfgfile = Path.cwd() / DEFAULT_CONFIG
                 if cfgfile.is_file() or not conf_required:
                     parsed_arg.config = [DEFAULT_CONFIG]

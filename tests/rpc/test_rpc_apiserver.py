@@ -366,7 +366,7 @@ def test_api_run(default_conf, mocker, caplog):
     assert log_has("SECURITY WARNING - Local Rest Server listening to external connections",
                    caplog)
     assert log_has("SECURITY WARNING - This is insecure please set to your loopback,"
-                   "e.g 127.0.0.1 in config.json", caplog)
+                   "e.g 127.0.0.1 in config_test.json", caplog)
     assert log_has("SECURITY WARNING - No password for local REST Server defined. "
                    "Please make sure that this is intentional!", caplog)
     assert log_has_re("SECURITY WARNING - `jwt_secret_key` seems to be default.*", caplog)

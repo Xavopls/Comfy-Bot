@@ -104,7 +104,7 @@ def test_load_config_file_error_range(default_conf, mocker, caplog) -> None:
 
 
 def test_load_file_error(tmpdir):
-    testpath = Path(tmpdir) / 'config.json'
+    testpath = Path(tmpdir) / 'config_test.json'
     with pytest.raises(OperationalException, match=r"File .* not found!"):
         load_file(testpath)
 
@@ -431,7 +431,7 @@ def test_setup_configuration_without_arguments(mocker, default_conf, caplog) -> 
 
     arglist = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
     ]
 
@@ -468,7 +468,7 @@ def test_setup_configuration_with_arguments(mocker, default_conf, caplog) -> Non
     )
     arglist = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--strategy', CURRENT_TEST_STRATEGY,
         '--datadir', '/foo/bar',
         '--userdir', "/tmp/freqtrade",
@@ -522,7 +522,7 @@ def test_setup_configuration_with_stratlist(mocker, default_conf, caplog) -> Non
 
     arglist = [
         'backtesting',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--timeframe', '1m',
         '--export', 'trades',
         '--strategy-list',
@@ -1181,7 +1181,7 @@ def test_pairlist_resolving_with_config(mocker, default_conf):
     patched_configuration_load_config_file(mocker, default_conf)
     arglist = [
         'download-data',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
     ]
 
     args = Arguments(arglist).get_parsed_arg()
@@ -1195,7 +1195,7 @@ def test_pairlist_resolving_with_config(mocker, default_conf):
     # Override pairs
     arglist = [
         'download-data',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--pairs', 'ETH/BTC', 'XRP/BTC',
     ]
 
@@ -1213,7 +1213,7 @@ def test_pairlist_resolving_with_config_pl(mocker, default_conf):
 
     arglist = [
         'download-data',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--pairs-file', 'tests/testdata/pairs.json',
     ]
 
@@ -1232,7 +1232,7 @@ def test_pairlist_resolving_with_config_pl_not_exists(mocker, default_conf):
 
     arglist = [
         'download-data',
-        '--config', 'config.json',
+        '--config', 'config_test.json',
         '--pairs-file', 'tests/testdata/pairs_doesnotexist.json',
     ]
 
@@ -1254,7 +1254,7 @@ def test_pairlist_resolving_fallback(mocker):
     ]
 
     args = Arguments(arglist).get_parsed_arg()
-    # Fix flaky tests if config.json exists
+    # Fix flaky tests if config_test.json exists
     args['config'] = None
 
     configuration = Configuration(args, RunMode.OTHER)

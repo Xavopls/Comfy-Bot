@@ -2349,6 +2349,6 @@ def test__send_msg_keyboard(default_conf, mocker, caplog) -> None:
     telegram._send_msg('test')
     used_keyboard = bot.send_message.call_args[1]['reply_markup']
     assert used_keyboard == custom_keyboard
-    assert log_has("using custom keyboard from config.json: "
+    assert log_has("using custom keyboard from config_test.json: "
                    "[['/daily', '/stats', '/balance', '/profit', '/profit 5'], ['/count', "
                    "'/start', '/reload_config', '/help']]", caplog)

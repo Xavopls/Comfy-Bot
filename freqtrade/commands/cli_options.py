@@ -62,7 +62,7 @@ AVAILABLE_CLI_OPTIONS = {
     "config": Arg(
         '-c', '--config',
         help=f'Specify configuration file (default: `userdir/{constants.DEFAULT_CONFIG}` '
-        f'or `config.json` whichever exists). '
+        f'or `config_test.json` whichever exists). '
         f'Multiple --config options may be used. '
         f'Can be set to `-` to read config from stdin.',
         action='append',

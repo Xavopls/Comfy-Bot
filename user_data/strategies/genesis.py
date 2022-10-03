@@ -1,6 +1,5 @@
 # ToDo:
 
-
 # pragma pylint: disable=missing-docstring, invalid-name, pointless-string-statement
 # flake8: noqa: F401
 # isort: skip_file
@@ -48,18 +47,22 @@ class Genesis(IStrategy):
     # Minimal ROI designed for the strategy.
     # This attribute will be overridden if the config file contains "minimal_roi".
     minimal_roi = {
-        "0": 100,
+        "0": 0.082,
+        "4": 0.031,
+        "14": 0.012,
+        "38": 0
     }
 
     # Optimal stoploss designed for the strategy.
     # This attribute will be overridden if the config file contains "stoploss".
-    stoploss = -0.02
+    stoploss = -0.339
 
     # Trailing stoploss
     trailing_stop = True
-    trailing_only_offset_is_reached = True
-    trailing_stop_positive = 0.015
-    trailing_stop_positive_offset = 0.071  # Disabled / not configured
+    trailing_stop_positive = 0.231
+    trailing_stop_positive_offset = 0.286
+    trailing_only_offset_is_reached = False
+
 
     # Optimal timeframe for the strategy.
     timeframe = '1m'
@@ -81,15 +84,24 @@ class Genesis(IStrategy):
     @property
     def protections(self):
         prot = []
+        ############ START HYPEROPT  ############
+        # if self.use_stop_protection.value:
+        #     prot.append({
+        #         "method": "StoplossGuard",
+        #         "lookback_period_candles": 24 * 3,
+        #         "trade_limit": self.trade_limit.value,
+        #         "stop_duration_candles": self.stop_duration.value,
+        #         "only_per_pair": False
+        #     })
+        ############ END HYPEROPT  ############
 
-        if self.use_stop_protection.value:
-            prot.append({
-                "method": "StoplossGuard",
-                "lookback_period_candles": 24 * 3,
-                "trade_limit": self.trade_limit.value,
-                "stop_duration_candles": self.stop_duration.value,
-                "only_per_pair": False
-            })
+        prot.append({
+            "method": "StoplossGuard",
+            "lookback_period_candles": 24 * 3,
+            "trade_limit": 3,
+            "stop_duration_candles": 10,
+            "only_per_pair": False
+        })
 
         return prot
 
@@ -467,42 +479,43 @@ class Genesis(IStrategy):
         :return: DataFrame with entry columns populated
         """
         ########################### START HYPEROPT ###########################
-        conditions = []
-
-        # Bollinger bands
-        conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
-        conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
-
-        # RSI
-        conditions.append(dataframe['rsi'] < self.buy_rsi.value)
-
-        # MACD
-        conditions.append(dataframe['macd'] < self.buy_macd.value)
-
-        # MFI
-        if self.buy_mfi_enabled:
-            conditions.append(dataframe['mfi'] < self.buy_mfi.value)
-
-        # Other
-        conditions.append((dataframe['volume'] > 0))
-
-        if conditions:
-            dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                'enter_long'] = 1
+        # conditions = []
+        #
+        # # Bollinger bands
+        # conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
+        # conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
+        #
+        # # RSI
+        # conditions.append(dataframe['rsi'] < self.buy_rsi.value)
+        #
+        # # MACD
+        # conditions.append(dataframe['macd'] < self.buy_macd.value)
+        #
+        # # MFI
+        # if self.buy_mfi_enabled:
+        #     conditions.append(dataframe['mfi'] < self.buy_mfi.value)
+        #
+        # # Other
+        # conditions.append((dataframe['volume'] > 0))
+        #
+        # if conditions:
+        #     dataframe.loc[
+        #         reduce(lambda x, y: x & y, conditions),
+        #         'enter_long'] = 1
         ########################### END HYPEROPT ###########################
 
-        # dataframe.loc[
-        #     (
-        #         (dataframe['bb_width_percentage'] > 0.851) &
-        #         (dataframe['bb_lowerband'] > dataframe['low']) &
-        #         (dataframe['rsi'] < 21.3) &
-        #
-        #         # Volume not 0
-        #         (dataframe['volume'] > 0)
-        #
-        #     ),
-        #     ['enter_long', 'enter_tag']] = (1, 'minor_low')
+        dataframe.loc[
+            (
+                (dataframe['bb_width_percentage'] > 0.629) &
+                (dataframe['bb_lowerband'] > dataframe['low']) &
+                (dataframe['rsi'] < 30.3) &
+                (dataframe['macd'] < 8.76) &
+                (dataframe['mfi'] < 2.1) &
+
+                # Volume not 0
+                (dataframe['volume'] > 0)
+            ),
+            ['enter_long', 'enter_tag']] = (1, 'minor_low')
 
         return dataframe
 
@@ -516,44 +529,46 @@ class Genesis(IStrategy):
 
         ########################### START HYPEROPT ###########################
 
-        conditions = []
-
-        # Bollingers
-        conditions.append((dataframe['high'] > dataframe['bb_upperband']))
-        conditions.append((dataframe['high_5m'] > dataframe['bb_upperband_5m']))
-        conditions.append((dataframe['bb_width_percentage']) > self.sell_bb_width_percentage.value)
-
-        # RSI
-        conditions.append(dataframe['rsi'] > self.sell_rsi.value)
-
-        # MACD
-        conditions.append(dataframe['macd'] > self.sell_macd.value)
-
-        # MFI
-        if self.sell_mfi_enabled:
-            conditions.append(dataframe['mfi'] > self.sell_mfi.value)
-
-        if conditions:
-            dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                'exit_long'] = 1
+        # conditions = []
+        #
+        # # Bollingers
+        # conditions.append((dataframe['high'] > dataframe['bb_upperband']))
+        # conditions.append((dataframe['high_5m'] > dataframe['bb_upperband_5m']))
+        # conditions.append((dataframe['bb_width_percentage']) > self.sell_bb_width_percentage.value)
+        #
+        # # RSI
+        # conditions.append(dataframe['rsi'] > self.sell_rsi.value)
+        #
+        # # MACD
+        # conditions.append(dataframe['macd'] > self.sell_macd.value)
+        #
+        # # MFI
+        # if self.sell_mfi_enabled:
+        #     conditions.append(dataframe['mfi'] > self.sell_mfi.value)
+        #
+        # if conditions:
+        #     dataframe.loc[
+        #         reduce(lambda x, y: x & y, conditions),
+        #         'exit_long'] = 1
 
         ########################### END HYPEROPT ###########################
 
-        # dataframe.loc[
-        #     (
-        #         (dataframe['rsi'] > 65.5) &
-        #         (dataframe['high'] > dataframe['bb_upperband']) &
-        #
-        #         (dataframe['high_5m'] > dataframe['bb_upperband_5m']) &
-        #
-        #
-        #         (dataframe['volume'] > 0)  # Make sure Volume is not 0
-        #     ),
-        #
-        #     ['exit_long', 'exit_tag']] = (1, 'exit_1')
-        #
-        # return dataframe
+        dataframe.loc[
+            (
+                (dataframe['rsi'] > 81.9) &
+                (dataframe['mfi'] > 79.7) &
+                (dataframe['macd'] > 14.33) &
+
+                (dataframe['high'] > dataframe['bb_upperband']) &
+                (dataframe['high_5m'] > dataframe['bb_upperband_5m']) &
+                (dataframe['bb_width_percentage'] > 0.506) &
+
+                (dataframe['volume'] > 0)  # Make sure Volume is not 0
+            ),
+
+            ['exit_long', 'exit_tag']] = (1, 'exit_1')
+
+        return dataframe
 
     # Support methods
 

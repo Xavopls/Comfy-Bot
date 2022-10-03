@@ -388,7 +388,7 @@ def add_arguments():
                         dest='config',
                         type=str,
                         metavar='PATH',
-                        default='config.json'
+                        default='config_test.json'
                         )
 
     parser.add_argument("command_arguments",

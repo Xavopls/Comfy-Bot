@@ -150,7 +150,7 @@ class ApiServer(RPCHandler):
         if not IPv4Address(rest_ip).is_loopback:
             logger.warning("SECURITY WARNING - Local Rest Server listening to external connections")
             logger.warning("SECURITY WARNING - This is insecure please set to your loopback,"
-                           "e.g 127.0.0.1 in config.json")
+                           "e.g 127.0.0.1 in config_test.json")
 
         if not self._config['api_server'].get('password'):
             logger.warning("SECURITY WARNING - No password for local REST Server defined. "

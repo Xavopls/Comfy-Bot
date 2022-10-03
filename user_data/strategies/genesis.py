@@ -221,9 +221,9 @@ class Genesis(IStrategy):
         # pairs = self.dp.current_whitelist()
         # Assign tf to each pair, so they can be downloaded and cached for strategy.
         # informative_pairs = [(pair, '5m') for pair in pairs]
-        # informative_pairs = [("ETH/USDT", "5m")]
+        informative_pairs = [("ETH/USDT", "5m")]
 
-        # return informative_pairs
+        return informative_pairs
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """

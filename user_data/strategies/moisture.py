@@ -112,11 +112,7 @@ class Moisture(IStrategy):
     # Supports/Resistances
     buy_support_error = DecimalParameter(low=0.995, high=1.005, default=1, decimals=3, space='buy', optimize=True)
     buy_support_length = IntParameter(low=30, high=180, default=105, space='buy', optimize=True, load=True)
-    buy_support_age_30 = BooleanParameter(default=False, space="buy", optimize=True)
-    buy_support_age_60 = BooleanParameter(default=False, space="buy", optimize=True)
-    buy_support_age_120 = BooleanParameter(default=False, space="buy", optimize=True)
-    buy_support_age_180 = BooleanParameter(default=False, space="buy", optimize=True)
-    buy_support_age_240 = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_support_age_choice = IntParameter(low=1, high=5, default=1, space='buy', optimize=True, load=True)
 
     # Bollinger bands
     # buy_bb_width_percentage = DecimalParameter(low=0.01, high=1, decimals=3, default=0.5, space='buy', optimize=True, load=True)
@@ -467,23 +463,23 @@ class Moisture(IStrategy):
         conditions = []
 
         # Supports
-        if self.buy_support_age_30:
+        if self.buy_support_age_choice.value == 1:
             conditions.append((dataframe['low'] <= dataframe['last_support_30'] * self.buy_support_error.value))
             conditions.append(dataframe['last_support_30'].shift(self.buy_support_length.value) == dataframe['last_support_30'])
 
-        elif self.buy_support_age_60:
+        elif self.buy_support_age_choice.value == 2:
             conditions.append((dataframe['low'] <= dataframe['last_support_60'] * self.buy_support_error.value))
             conditions.append(dataframe['last_support_60'].shift(self.buy_support_length.value) == dataframe['last_support_60'])
 
-        elif self.buy_support_age_120:
+        elif self.buy_support_age_choice.value == 3:
             conditions.append((dataframe['low'] <= dataframe['last_support_120'] * self.buy_support_error.value))
             conditions.append(dataframe['last_support_120'].shift(self.buy_support_length.value) == dataframe['last_support_120'])
 
-        elif self.buy_support_age_180:
+        elif self.buy_support_age_choice.value == 4:
             conditions.append((dataframe['low'] <= dataframe['last_support_180'] * self.buy_support_error.value))
             conditions.append(dataframe['last_support_180'].shift(self.buy_support_length.value) == dataframe['last_support_180'])
 
-        elif self.buy_support_age_240:
+        elif self.buy_support_age_choice.value == 5:
             conditions.append((dataframe['low'] <= dataframe['last_support_240'] * self.buy_support_error.value))
             conditions.append(dataframe['last_support_240'].shift(self.buy_support_length.value) == dataframe['last_support_240'])
 

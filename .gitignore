@@ -13,11 +13,13 @@ user_data/notebooks
 user_data/models
 user_data/plot
 user_data/data
+user_data/strategies/*json
 user_data/backtest_results
 user_data/freqaimodels
 user_data/freqaimodels/*
 user_data/models/*
 user_data/notebooks/*
+user_data/hyperopt_results/*
 freqtrade-plot.html
 freqtrade-profit-plot.html
 freqtrade/rpc/api_server/ui/*

@@ -82,14 +82,14 @@ class Moisture(IStrategy):
     def protections(self):
         prot = []
         ############ START HYPEROPT  ############
-        if self.use_stop_protection.value:
-            prot.append({
-                "method": "StoplossGuard",
-                "lookback_period_candles": 24 * 3,
-                "trade_limit": self.trade_limit.value,
-                "stop_duration_candles": self.stop_duration.value,
-                "only_per_pair": False
-            })
+        # if self.use_stop_protection.value:
+        #     prot.append({
+        #         "method": "StoplossGuard",
+        #         "lookback_period_candles": 24 * 3,
+        #         "trade_limit": self.trade_limit.value,
+        #         "stop_duration_candles": self.stop_duration.value,
+        #         "only_per_pair": False
+        #     })
         ############ END HYPEROPT  ############
 
         # prot.append({
@@ -142,6 +142,9 @@ class Moisture(IStrategy):
     # buy_macd = DecimalParameter(low=-10, high=10, decimals=2, default=-3, space='buy', optimize=True, load=True)
     # sell_macd = DecimalParameter(low=0, high=15, decimals=2, default=-3, space='sell', optimize=True, load=True)
 
+    # Ichimoku cloud
+
+    buy_cloud_height_percentage = DecimalParameter(default=0.5, low=0.01, high=4, decimals=2, optimize=True, load=True)
     # EMA
     # buy_ema5_enabled = BooleanParameter(default=True, space='buy')
 
@@ -164,11 +167,15 @@ class Moisture(IStrategy):
 
     plot_config = {
         'main_plot': {
-            'bb_upperband': {'color': 'blue'},
-            'bb_lowerband': {'color': 'red'},
+            # 'bb_upperband': {'color': 'blue'},
+            # 'bb_lowerband': {'color': 'red'},
             # 'last_resistance': {'color': 'black'},
             # 'last_support': {'color': 'blue'},
-
+            # 'tenkansen': {'color': 'pink'},
+            # 'kijunsen': {'color': 'blue'},
+            # 'chiku_span': {'color': 'purple'},
+            'senkou_a': {'color': 'green'},
+            'senkou_b': {'color': 'red'},
         },
         'subplots': {
             "RSI": {
@@ -179,6 +186,10 @@ class Moisture(IStrategy):
             "MACD": {
                 'macd': {'color': 'black'},
             },
+            "IC_%": {
+                'cloud_height_percentage': {'color': 'orange'},
+            },
+
             #
             # "MFI": {
             #     'mfi': {'color': 'black'},
@@ -434,6 +445,16 @@ class Moisture(IStrategy):
 
         ######################## Custom ########################
 
+
+        # Ichimoku cloud
+        dataframe['tenkansen'] = (dataframe['high'].shift(9) + dataframe['low'].shift(9)) / 2
+        dataframe['kijunsen'] = (dataframe['high'].shift(26) + dataframe['low'].shift(26)) / 2
+        dataframe['chiku_span'] = dataframe['close'].shift(26)
+        dataframe['senkou_a'] = (dataframe['tenkansen'] + dataframe['kijunsen']) / 2
+        dataframe['senkou_b'] = (dataframe['high'].shift(52) + dataframe['low'].shift(52)) / 2
+        dataframe['cloud_height_percentage'] = \
+            abs(dataframe['senkou_a'] / dataframe['senkou_b'] * 100 - 100)
+
         # Resistances
         dataframe['last_resistance'] = \
             (dataframe['high'].rolling(240).max().shift())
@@ -463,40 +484,46 @@ class Moisture(IStrategy):
         conditions = []
 
         # Supports
-        if self.buy_support_age_choice.value == 1:
-            conditions.append((dataframe['low'] <= dataframe['last_support_30'] * self.buy_support_error.value))
-            conditions.append(dataframe['last_support_30'].shift(self.buy_support_length.value) == dataframe['last_support_30'])
+        # if self.buy_support_age_choice.value == 1:
+        #     conditions.append((dataframe['low'] <= dataframe['last_support_30'] * self.buy_support_error.value))
+        #     conditions.append(dataframe['last_support_30'].shift(self.buy_support_length.value) == dataframe['last_support_30'])
+        #
+        # elif self.buy_support_age_choice.value == 2:
+        #     conditions.append((dataframe['low'] <= dataframe['last_support_60'] * self.buy_support_error.value))
+        #     conditions.append(dataframe['last_support_60'].shift(self.buy_support_length.value) == dataframe['last_support_60'])
+        #
+        # elif self.buy_support_age_choice.value == 3:
+        #     conditions.append((dataframe['low'] <= dataframe['last_support_120'] * self.buy_support_error.value))
+        #     conditions.append(dataframe['last_support_120'].shift(self.buy_support_length.value) == dataframe['last_support_120'])
+        #
+        # elif self.buy_support_age_choice.value == 4:
+        #     conditions.append((dataframe['low'] <= dataframe['last_support_180'] * self.buy_support_error.value))
+        #     conditions.append(dataframe['last_support_180'].shift(self.buy_support_length.value) == dataframe['last_support_180'])
+        #
+        # elif self.buy_support_age_choice.value == 5:
+        #     conditions.append((dataframe['low'] <= dataframe['last_support_240'] * self.buy_support_error.value))
+        #     conditions.append(dataframe['last_support_240'].shift(self.buy_support_length.value) == dataframe['last_support_240'])
 
-        elif self.buy_support_age_choice.value == 2:
-            conditions.append((dataframe['low'] <= dataframe['last_support_60'] * self.buy_support_error.value))
-            conditions.append(dataframe['last_support_60'].shift(self.buy_support_length.value) == dataframe['last_support_60'])
 
-        elif self.buy_support_age_choice.value == 3:
-            conditions.append((dataframe['low'] <= dataframe['last_support_120'] * self.buy_support_error.value))
-            conditions.append(dataframe['last_support_120'].shift(self.buy_support_length.value) == dataframe['last_support_120'])
-
-        elif self.buy_support_age_choice.value == 4:
-            conditions.append((dataframe['low'] <= dataframe['last_support_180'] * self.buy_support_error.value))
-            conditions.append(dataframe['last_support_180'].shift(self.buy_support_length.value) == dataframe['last_support_180'])
-
-        elif self.buy_support_age_choice.value == 5:
-            conditions.append((dataframe['low'] <= dataframe['last_support_240'] * self.buy_support_error.value))
-            conditions.append(dataframe['last_support_240'].shift(self.buy_support_length.value) == dataframe['last_support_240'])
-
-
-        # # Bollinger bands
+        # Bollinger bands
         # conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
         # conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
-        #
-        # # RSI
+
+        # RSI
         # conditions.append(dataframe['rsi'] < self.buy_rsi.value)
-        #
-        # # MACD
+
+        # MACD
         # conditions.append(dataframe['macd'] < self.buy_macd.value)
-        #
-        # # MFI
+
+        # MFI
         # if self.buy_mfi_enabled:
         #     conditions.append(dataframe['mfi'] < self.buy_mfi.value)
+
+        # Ichimoku
+        conditions.append(dataframe['cloud_height_percentage'] > self.buy_cloud_height_percentage.value)
+        conditions.append(dataframe['low'] > dataframe['senkou_a'])
+        conditions.append(dataframe['low'] > dataframe['senkou_b'])
+        conditions.append(dataframe['senkou_a'] > dataframe['senkou_b'])
 
         # Other
         conditions.append((dataframe['volume'] > 0))
@@ -508,23 +535,28 @@ class Moisture(IStrategy):
         ########################### END HYPEROPT ###########################
         # dataframe.loc[
         #     (
-        #         (dataframe['low'] < dataframe['last_support'] * 1.001) &
-        #         (dataframe['low'] > dataframe['last_support'] * 0.999) &
-        #         (dataframe['last_support'].shift(60) == dataframe['last_support']) &
-        #         # (dataframe['bb_lowerband'] > dataframe['low']) &
-        #         # (dataframe['bb_upperband'] > dataframe['high']) &
-        #
-        #         # (dataframe['CDLHAMMER'] > 1) &
-        #         # Current bullish
-        #         # (dataframe['open'] < dataframe['close']) &
-        #         # Last bullish
-        #         # (dataframe['open'].shift(1) < dataframe['close'].shift(1)) &
-        #
-        #         # (dataframe['rsi'] < 35) &
-        #         # Volume not 0
-        #         (dataframe['volume'] > 0)
-        #     ),
-        #     ['enter_long', 'enter_tag']] = (1, 'minor_low')
+                # Ichimoku
+                # (dataframe['low'] > dataframe['senkou_a']) &
+                # (dataframe['low'] > dataframe['senkou_b']) &
+                # (dataframe['senkou_a'] > dataframe['senkou_b']) &
+
+                # (dataframe['low'] < dataframe['last_support_60'] * 1.001) &
+                # (dataframe['low'] > dataframe['last_support_60'] * 0.999) &
+                # (dataframe['last_support_60'].shift(60) == dataframe['last_support_60']) &
+                # (dataframe['bb_lowerband'] > dataframe['low']) &
+                # (dataframe['bb_upperband'] > dataframe['high']) &
+
+                # (dataframe['CDLHAMMER'] > 1) &
+                # Current bullish
+                # (dataframe['open'] < dataframe['close']) &
+                # Last bullish
+                # (dataframe['open'].shift(1) < dataframe['close'].shift(1)) &
+
+                # (dataframe['rsi'] < 35) &
+                # Volume not 0
+                # (dataframe['volume'] > 0)
+            # ),
+            # ['enter_long', 'enter_tag']] = (1, 'minor_low')
 
         return dataframe
 
@@ -538,7 +570,7 @@ class Moisture(IStrategy):
 
         ########################### START HYPEROPT ###########################
 
-        # conditions = []
+        conditions = []
         #
         # # Bollingers
         # conditions.append((dataframe['high'] > dataframe['bb_upperband']))
@@ -555,15 +587,27 @@ class Moisture(IStrategy):
         # if self.sell_mfi_enabled:
         #     conditions.append(dataframe['mfi'] > self.sell_mfi.value)
         #
-        # if conditions:
-        #     dataframe.loc[
-        #         reduce(lambda x, y: x & y, conditions),
-        #         'exit_long'] = 1
+
+        conditions.append(dataframe['high'] < dataframe['senkou_a'])
+        conditions.append(dataframe['high'] < dataframe['senkou_b'])
+        conditions.append(dataframe['senkou_b'] > dataframe['senkou_a'])
+        conditions.append(dataframe['volume'] > 0)
+
+        if conditions:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions),
+                'exit_long'] = 1
 
         ########################### END HYPEROPT ###########################
 
         dataframe.loc[
             (
+                # Ichimoku
+                (dataframe['high'] < dataframe['senkou_a']) &
+                (dataframe['high'] < dataframe['senkou_b']) &
+                (dataframe['senkou_b'] > dataframe['senkou_a']) &
+
+
                 # (dataframe['rsi'] > 81.9) &
                 # (dataframe['mfi'] > 79.7) &
                 # (dataframe['macd'] > 14.33) &
@@ -571,7 +615,7 @@ class Moisture(IStrategy):
                 # (dataframe['high'] > dataframe['bb_upperband']) &
                 # (dataframe['bb_width_percentage'] > 0.506) &
                 #
-                # (dataframe['volume'] > 0)  # Make sure Volume is not 0
+                (dataframe['volume'] > 0)  # Make sure Volume is not 0
             ),
 
             ['exit_long', 'exit_tag']] = (1, 'exit_1')

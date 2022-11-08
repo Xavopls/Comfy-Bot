@@ -62,7 +62,7 @@ class Moisture(IStrategy):
 
 
     # Optimal timeframe for the strategy.
-    timeframe = '1m'
+    timeframe = '5m'
 
     # Run "populate_indicators()" only for new candle.
     process_only_new_candles = True
@@ -167,27 +167,18 @@ class Moisture(IStrategy):
 
     plot_config = {
         'main_plot': {
-            # 'bb_upperband': {'color': 'blue'},
-            # 'bb_lowerband': {'color': 'red'},
-            # 'last_resistance': {'color': 'black'},
-            # 'last_support': {'color': 'blue'},
-            # 'tenkansen': {'color': 'pink'},
-            # 'kijunsen': {'color': 'blue'},
-            # 'chiku_span': {'color': 'purple'},
-            'senkou_a': {'color': 'green'},
-            'senkou_b': {'color': 'red'},
+            'vwap': {'color': 'yellow'},
+            'ema12': {'color': 'red'},
         },
         'subplots': {
-            "RSI": {
-                'rsi': {'color': 'purple'},
-                'rsi_sma': {'color': 'yellow'},
+            "wt1": {
+                'wt1': {'color': 'purple', 'fill_to': 'zero'},
+                'zero': {'color': 'black'},
             },
 
-            "MACD": {
-                'macd': {'color': 'black'},
-            },
-            "IC_%": {
-                'cloud_height_percentage': {'color': 'orange'},
+            "wt2": {
+                'wt2': {'color': 'orange', 'fill_to': 'zero'},
+                'zero': {'color': 'black'},
             },
 
             #
@@ -320,6 +311,19 @@ class Moisture(IStrategy):
 
         # # ROC
         # dataframe['roc'] = ta.ROC(dataframe)
+
+
+        dataframe['vwap'] = qtpylib.rolling_vwap(dataframe)
+        dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
+        dataframe['hlc3'] = (dataframe['high'] + dataframe['low'] + dataframe['close']) / 3
+        esa = ta.EMA(dataframe['hlc3'], 9)
+
+        de = ta.EMA(abs(dataframe['hlc3'] - esa), 9)
+        ci = (dataframe['hlc3'] - esa) / (0.015 * de)
+
+        dataframe['wt1'] = ta.EMA(ci, 12)
+        dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
+        dataframe['zero'] = 0
 
         # Overlap Studies
         # ------------------------------------
@@ -520,21 +524,21 @@ class Moisture(IStrategy):
         #     conditions.append(dataframe['mfi'] < self.buy_mfi.value)
 
         # Ichimoku
-        conditions.append(dataframe['cloud_height_percentage'] > self.buy_cloud_height_percentage.value)
-        conditions.append(dataframe['low'] > dataframe['senkou_a'])
-        conditions.append(dataframe['low'] > dataframe['senkou_b'])
-        conditions.append(dataframe['senkou_a'] > dataframe['senkou_b'])
+        # conditions.append(dataframe['cloud_height_percentage'] > self.buy_cloud_height_percentage.value)
+        # conditions.append(dataframe['low'] > dataframe['senkou_a'])
+        # conditions.append(dataframe['low'] > dataframe['senkou_b'])
+        # conditions.append(dataframe['senkou_a'] > dataframe['senkou_b'])
 
         # Other
-        conditions.append((dataframe['volume'] > 0))
+        # conditions.append((dataframe['volume'] > 0))
 
-        if conditions:
-            dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                'enter_long'] = 1
+        # if conditions:
+        #     dataframe.loc[
+        #         reduce(lambda x, y: x & y, conditions),
+        #         'enter_long'] = 1
         ########################### END HYPEROPT ###########################
-        # dataframe.loc[
-        #     (
+        dataframe.loc[
+         (
                 # Ichimoku
                 # (dataframe['low'] > dataframe['senkou_a']) &
                 # (dataframe['low'] > dataframe['senkou_b']) &
@@ -554,9 +558,9 @@ class Moisture(IStrategy):
 
                 # (dataframe['rsi'] < 35) &
                 # Volume not 0
-                # (dataframe['volume'] > 0)
-            # ),
-            # ['enter_long', 'enter_tag']] = (1, 'minor_low')
+                (dataframe['volume'] > 0)
+             ),
+             ['enter_long', 'enter_tag']] = (1, 'minor_low')
 
         return dataframe
 

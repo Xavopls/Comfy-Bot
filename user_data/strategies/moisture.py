@@ -8,7 +8,7 @@ from functools import reduce
 from json import load
 import numpy as np  # noqa
 import pandas as pd  # noqa
-from pandas import DataFrame
+from pandas import DataFrame, notnull
 
 from freqtrade.strategy import (BooleanParameter, CategoricalParameter, DecimalParameter,
                                 IStrategy, IntParameter, informative, merge_informative_pair)
@@ -47,7 +47,7 @@ class Moisture(IStrategy):
     # Minimal ROI designed for the strategy.
     # This attribute will be overridden if the config file contains "minimal_roi".
     minimal_roi = {
-        "0": 0.04,
+        "0": 0.2,
     }
 
     # Optimal stoploss designed for the strategy.
@@ -59,7 +59,6 @@ class Moisture(IStrategy):
     # trailing_stop_positive = 0.231
     # trailing_stop_positive_offset = 0.286
     # trailing_only_offset_is_reached = False
-
 
     # Optimal timeframe for the strategy.
     timeframe = '5m'
@@ -169,16 +168,20 @@ class Moisture(IStrategy):
         'main_plot': {
             'vwap': {'color': 'yellow'},
             'ema12': {'color': 'red'},
+            'support': {'color': 'purple'},
+            # 'resistance': {'color': 'purple'}
         },
         'subplots': {
-            "wt1": {
-                'wt1': {'color': 'purple', 'fill_to': 'zero'},
+            "xd": {
+                'wt1': {'color': 'blue', 'fill_to': 'zero'},
+                'wt2': {'color': 'purple', 'fill_to': 'zero'},
                 'zero': {'color': 'black'},
             },
 
-            "wt2": {
-                'wt2': {'color': 'orange', 'fill_to': 'zero'},
-                'zero': {'color': 'black'},
+            "xd2": {
+                'support': {'color': 'purple'},
+                'support_t': {'color': 'orange'},
+
             },
 
             #
@@ -312,18 +315,25 @@ class Moisture(IStrategy):
         # # ROC
         # dataframe['roc'] = ta.ROC(dataframe)
 
+        dataframe_session = dataframe
+        dataframe_session['date'] = pd.to_datetime(dataframe['date'], utc=True)
 
-        dataframe['vwap'] = qtpylib.rolling_vwap(dataframe)
+        dataframe_session.set_index('date', inplace=True)
+
+        dataframe_session = qtpylib.session(dataframe_session, start='08:30', end='15:15')
+
+        dataframe['vwap'] = qtpylib.rolling_vwap(dataframe, 200)
         dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
+        dataframe['ema240'] = ta.EMA(dataframe, timeperiod=240)
         dataframe['hlc3'] = (dataframe['high'] + dataframe['low'] + dataframe['close']) / 3
         esa = ta.EMA(dataframe['hlc3'], 9)
-
         de = ta.EMA(abs(dataframe['hlc3'] - esa), 9)
         ci = (dataframe['hlc3'] - esa) / (0.015 * de)
 
         dataframe['wt1'] = ta.EMA(ci, 12)
         dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
-        dataframe['zero'] = 0
+
+        dataframe = self.create_supports(dataframe)
 
         # Overlap Studies
         # ------------------------------------
@@ -449,7 +459,6 @@ class Moisture(IStrategy):
 
         ######################## Custom ########################
 
-
         # Ichimoku cloud
         dataframe['tenkansen'] = (dataframe['high'].shift(9) + dataframe['low'].shift(9)) / 2
         dataframe['kijunsen'] = (dataframe['high'].shift(26) + dataframe['low'].shift(26)) / 2
@@ -508,7 +517,6 @@ class Moisture(IStrategy):
         #     conditions.append((dataframe['low'] <= dataframe['last_support_240'] * self.buy_support_error.value))
         #     conditions.append(dataframe['last_support_240'].shift(self.buy_support_length.value) == dataframe['last_support_240'])
 
-
         # Bollinger bands
         # conditions.append((dataframe['bb_width_percentage']) > self.buy_bb_width_percentage.value)
         # conditions.append((dataframe['bb_lowerband'] > dataframe['low']))
@@ -538,29 +546,16 @@ class Moisture(IStrategy):
         #         'enter_long'] = 1
         ########################### END HYPEROPT ###########################
         dataframe.loc[
-         (
-                # Ichimoku
-                # (dataframe['low'] > dataframe['senkou_a']) &
-                # (dataframe['low'] > dataframe['senkou_b']) &
-                # (dataframe['senkou_a'] > dataframe['senkou_b']) &
+            (
+                    (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
+                    (qtpylib.crossed_above(dataframe['wt1'], dataframe['wt2'])) &
+                    (dataframe['wt2'] < 0) &
+                    (dataframe['close'] < dataframe['vwap']) &
 
-                # (dataframe['low'] < dataframe['last_support_60'] * 1.001) &
-                # (dataframe['low'] > dataframe['last_support_60'] * 0.999) &
-                # (dataframe['last_support_60'].shift(60) == dataframe['last_support_60']) &
-                # (dataframe['bb_lowerband'] > dataframe['low']) &
-                # (dataframe['bb_upperband'] > dataframe['high']) &
-
-                # (dataframe['CDLHAMMER'] > 1) &
-                # Current bullish
-                # (dataframe['open'] < dataframe['close']) &
-                # Last bullish
-                # (dataframe['open'].shift(1) < dataframe['close'].shift(1)) &
-
-                # (dataframe['rsi'] < 35) &
-                # Volume not 0
-                (dataframe['volume'] > 0)
-             ),
-             ['enter_long', 'enter_tag']] = (1, 'minor_low')
+                    # Volume not 0
+                    (dataframe['volume'] > 0)
+            ),
+            ['enter_long', 'enter_tag']] = (1, 'minor_low')
 
         return dataframe
 
@@ -592,34 +587,21 @@ class Moisture(IStrategy):
         #     conditions.append(dataframe['mfi'] > self.sell_mfi.value)
         #
 
-        conditions.append(dataframe['high'] < dataframe['senkou_a'])
-        conditions.append(dataframe['high'] < dataframe['senkou_b'])
-        conditions.append(dataframe['senkou_b'] > dataframe['senkou_a'])
-        conditions.append(dataframe['volume'] > 0)
-
-        if conditions:
-            dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                'exit_long'] = 1
+        # conditions.append(dataframe['high'] < dataframe['senkou_a'])
+        # conditions.append(dataframe['high'] < dataframe['senkou_b'])
+        # conditions.append(dataframe['senkou_b'] > dataframe['senkou_a'])
+        # conditions.append(dataframe['volume'] > 0)
+        #
+        # if conditions:
+        #     dataframe.loc[
+        #         reduce(lambda x, y: x & y, conditions),
+        #         'exit_long'] = 1
 
         ########################### END HYPEROPT ###########################
 
         dataframe.loc[
             (
-                # Ichimoku
-                (dataframe['high'] < dataframe['senkou_a']) &
-                (dataframe['high'] < dataframe['senkou_b']) &
-                (dataframe['senkou_b'] > dataframe['senkou_a']) &
-
-
-                # (dataframe['rsi'] > 81.9) &
-                # (dataframe['mfi'] > 79.7) &
-                # (dataframe['macd'] > 14.33) &
-                #
-                # (dataframe['high'] > dataframe['bb_upperband']) &
-                # (dataframe['bb_width_percentage'] > 0.506) &
-                #
-                (dataframe['volume'] > 0)  # Make sure Volume is not 0
+                (dataframe['wt2'] > 55)
             ),
 
             ['exit_long', 'exit_tag']] = (1, 'exit_1')
@@ -710,3 +692,21 @@ class Moisture(IStrategy):
                 # Downhill heavier than 3.5%
                 (((1 - dataframe['low'].shift(1) / dataframe['high'].shift(4)) * 100) > 3.5)
         )
+
+    def create_supports(self, df):
+        # Support
+        df['support_t'] = df[(df['low'].shift(2) < df['low'].shift(3)) & \
+                           (df['low'].shift(2) < df['low'].shift(1)) & \
+                           (df['low'].shift(1) < df['low']) & \
+                           (df['low'].shift(3) < df['low'].shift(4))]['low']
+
+        df['support'] = df['support_t'].rolling(200).sum().fillna(method='bfill')
+
+        return df
+
+        # # Resistance
+        # if (df['high'].shift(2) > df['high'].shift(3)) & \
+        #    (df['high'].shift(2) > df['high'].shift(1)) & \
+        #    (df['high'].shift(1) > df['high']) & \
+        #    (df['high'].shift(3) > df['high'].shift(4)):
+        #      df['resistance'] = df['high'].shift(2)

@@ -19,6 +19,7 @@ import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 from datetime import datetime, timedelta, time
 from freqtrade.persistence import Trade
+from freqtrade.exchange import timeframe_to_prev_date
 
 
 # This class is a sample. Feel free to customize it.
@@ -50,7 +51,7 @@ class Bb(IStrategy):
     # Minimal ROI designed for the strategy.
     # This attribute will be overridden if the config file contains "minimal_roi".
     minimal_roi = {
-        "0": 0.15,
+        "0": 0.30,
     }
 
     # Optimal stoploss designed for the strategy.
@@ -98,10 +99,9 @@ class Bb(IStrategy):
 
     plot_config = {
         'main_plot': {
-            "bb_middleband": {'color': 'blue'},
             'ema12': {'color': 'red'},
             'vwap': {'color': 'yellow'},
-            'last_support_40': {'color': 'black'},
+            'support': {'color': 'purple'},
 
         },
         'subplots': {
@@ -144,14 +144,13 @@ class Bb(IStrategy):
         :return: a Dataframe with all mandatory indicators for the strategies
         """
 
-        dataframe = self.custom_session(dataframe, start='09:30', end='16:00')
-        dataframe['vwap'] = self.custom_vwap(dataframe, '01:00')
+        update_time = '01:00'
 
-        bollinger = qtpylib.bollinger_bands(qtpylib.typical_price(dataframe), window=20, stds=2)
-        dataframe['bb_lowerband'] = bollinger['lower']
-        dataframe['bb_middleband'] = bollinger['mid']
-        dataframe['bb_upperband'] = bollinger['upper']
-        dataframe['bb_width_percentage'] = ((dataframe['bb_lowerband'] / dataframe['bb_upperband']) - 1) * -100
+        # dataframe = self.custom_session(dataframe, start='09:30', end='16:00')
+        dataframe['vwap'] = self.custom_vwap(dataframe, update_time)
+        dataframe = self.create_supports(dataframe, update_time)
+
+
         dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
         dataframe['ema200'] = ta.EMA(dataframe, timeperiod=200)
         dataframe['last_support_40'] = \
@@ -163,6 +162,9 @@ class Bb(IStrategy):
 
         dataframe['wt1'] = ta.EMA(ci, 12)
         dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
+
+        dataframe['last_resistance'] = \
+            (dataframe['high'].rolling(240).max().shift())
 
         return dataframe
 
@@ -186,13 +188,15 @@ class Bb(IStrategy):
         :param **kwargs: Ensure to keep this here so updates to this won't break your strategy.
         :return float: New stoploss value, relative to the current rate
         """
-
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
-        last_candle = dataframe.iloc[-1].squeeze()
-        stoploss_price = last_candle['last_support_40']
 
-        if stoploss_price < current_rate:
-            return (stoploss_price / current_rate) - 1
+        trade_date = timeframe_to_prev_date(self.timeframe, trade.open_date_utc)
+        trade_candle = dataframe.loc[dataframe['date'] == trade_date]
+        if not trade_candle.empty:
+            trade_candle = trade_candle.squeeze()
+            stoploss_price = trade_candle['support']
+            if stoploss_price < current_rate:
+                return (stoploss_price / current_rate) - 1
         return 1
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -210,13 +214,22 @@ class Bb(IStrategy):
                     (dataframe['wt2'] < 0) &
                     (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
 
-                    (dataframe['low'] < dataframe['bb_lowerband']) &
                     # Volume not 0
                     (dataframe['volume'] > 0)
             ),
-            ['enter_long', 'enter_tag']] = (1, 'minor_low')
+            ['enter_long', 'enter_tag']] = (1, 'buy_signal')
 
         return dataframe
+
+    def custom_exit(self, pair: str, trade: Trade, current_time: datetime, current_rate: float,
+                    current_profit: float, **kwargs):
+        dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
+        sl_tp_ratio = 2
+        sell_condition = current_rate >= (trade.open_rate + sl_tp_ratio *(trade.open_rate - trade.stop_loss))
+        if trade.enter_tag == 'buy_signal' and sell_condition:
+            return 'sell_signal'
+        return None
+
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
@@ -228,9 +241,6 @@ class Bb(IStrategy):
 
         dataframe.loc[
             (
-                    (qtpylib.crossed_above(dataframe['close'], (dataframe['ema200'] * 0.9995))) &
-                    # Volume not 0
-                    (dataframe['volume'] > 0)
             ),
 
             ['exit_long', 'exit_tag']] = (1, 'exit_1')
@@ -238,6 +248,9 @@ class Bb(IStrategy):
         return dataframe
 
     # Support methods
+
+
+
 
     def custom_session(self, df: DataFrame, start, end):
         """
@@ -279,5 +292,12 @@ class Bb(IStrategy):
         df['reset_time'] = np.where((time == reset_time), 1, 0)
         df['cumsum'] = df['reset_time'].cumsum()
         res = df.groupby(df['cumsum'])['tmp_data'].cumsum()
-
         return res
+
+
+    def create_supports(self, df, reset_time):
+        df['reset'] = np.where((df.index % 40 == 0) | (df['time'] == reset_time), 1, 0)
+        df['cumsum'] = df['reset'].cumsum()
+        df['support'] = df.groupby('cumsum')['low'].transform('min')
+        return df
+

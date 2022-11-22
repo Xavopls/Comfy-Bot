@@ -24,22 +24,7 @@ from freqtrade.exchange import timeframe_to_prev_date
 
 # This class is a sample. Feel free to customize it.
 class Bb(IStrategy):
-    """
-    This is a sample strategy to inspire you.
-    More information in https://www.freqtrade.io/en/latest/strategy-customization/
 
-    You can:
-        :return: a Dataframe with all mandatory indicators for the strategies
-    - Rename the class name (Do not forget to update class_name)
-    - Add any methods you want to build your strategy
-    - Add any lib you need to build your strategy
-
-    You must keep:
-    - the lib in the section "Do not remove these libs"
-    - the methods: populate_indicators, populate_entry_trend, populate_exit_trend
-    You should keep:
-    - timeframe, minimal_roi, stoploss, trailing_*
-    """
     # Strategy interface version - allow new iterations of the strategy interface.
     # Check the documentation or the Sample strategy to get the latest version.
     INTERFACE_VERSION = 3
@@ -74,6 +59,12 @@ class Bb(IStrategy):
     use_exit_signal = True
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
+
+
+    # Hyperoptable parameters
+    buy_above_vwap = BooleanParameter(default=False, space="buy", optimize=True)
+
+
 
     @property
     def protections(self):
@@ -294,10 +285,21 @@ class Bb(IStrategy):
         res = df.groupby(df['cumsum'])['tmp_data'].cumsum()
         return res
 
-
     def create_supports(self, df, reset_time):
-        df['reset'] = np.where((df.index % 40 == 0) | (df['time'] == reset_time), 1, 0)
+
+        # Hardcoded... Sorry.
+        df['reset'] = np.where((df['time'] == '01:00') |
+                               (df['time'] == '04:20') |
+                               (df['time'] == '07:40') |
+                               (df['time'] == '11:00') |
+                               (df['time'] == '14:20') |
+                               (df['time'] == '17:40') |
+                               (df['time'] == '21:00') |
+                               (df['time'] == '00:20'), 1, 0)
         df['cumsum'] = df['reset'].cumsum()
         df['support'] = df.groupby('cumsum')['low'].transform('min')
+        with pd.option_context('display.max_rows', None, 'display.max_columns',
+                               None):  # more options can be specified also
+            print(df)
         return df
 

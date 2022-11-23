@@ -24,7 +24,6 @@ from freqtrade.exchange import timeframe_to_prev_date
 
 # This class is a sample. Feel free to customize it.
 class Bb(IStrategy):
-
     # Strategy interface version - allow new iterations of the strategy interface.
     # Check the documentation or the Sample strategy to get the latest version.
     INTERFACE_VERSION = 3
@@ -60,11 +59,16 @@ class Bb(IStrategy):
     exit_profit_only = False
     ignore_roi_if_entry_signal = False
 
-
     # Hyperoptable parameters
+    # todo: change vwap session start time to 13:30 utc
     buy_above_vwap = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_tp_sl_ratio = DecimalParameter(low=1.0, high=3.0, decimals=1,
+                                       default=2.0, space='buy', optimize=True, load=True)
 
-
+    sell_support_margin_percentage = DecimalParameter(low=0.92, high=1.00, decimals=2,
+                                                      default=1.0, space='sell', optimize=True, load=True)
 
     @property
     def protections(self):
@@ -99,6 +103,9 @@ class Bb(IStrategy):
             'wt': {
                 'wt1': {'color': 'red'},
                 'wt2': {'color': 'blue'},
+            },
+            'RSI': {
+                'rsi': {'color': 'purple'},
             }
 
         }
@@ -135,27 +142,19 @@ class Bb(IStrategy):
         :return: a Dataframe with all mandatory indicators for the strategies
         """
 
-        update_time = '01:00'
-
         # dataframe = self.custom_session(dataframe, start='09:30', end='16:00')
-        dataframe['vwap'] = self.custom_vwap(dataframe, update_time)
-        dataframe = self.create_supports(dataframe, update_time)
-
-
+        dataframe['vwap'] = self.custom_vwap(dataframe, '01:00')
+        dataframe = self.create_supports(dataframe, '01:00')
+        dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
         dataframe['ema200'] = ta.EMA(dataframe, timeperiod=200)
-        dataframe['last_support_40'] = \
-            (dataframe['low'].rolling(40).min().shift())
         dataframe['hlc3'] = (dataframe['high'] + dataframe['low'] + dataframe['close']) / 3
         esa = ta.EMA(dataframe['hlc3'], 9)
         de = ta.EMA(abs(dataframe['hlc3'] - esa), 9)
         ci = (dataframe['hlc3'] - esa) / (0.015 * de)
-
+        dataframe['day_of_week'] = dataframe['date'].dt.day_name()
         dataframe['wt1'] = ta.EMA(ci, 12)
         dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
-
-        dataframe['last_resistance'] = \
-            (dataframe['high'].rolling(240).max().shift())
 
         return dataframe
 
@@ -186,6 +185,7 @@ class Bb(IStrategy):
         if not trade_candle.empty:
             trade_candle = trade_candle.squeeze()
             stoploss_price = trade_candle['support']
+            stoploss_price = stoploss_price * self.sell_support_margin_percentage.value
             if stoploss_price < current_rate:
                 return (stoploss_price / current_rate) - 1
         return 1
@@ -198,29 +198,51 @@ class Bb(IStrategy):
         :return: DataFrame with entry columns populated
         """
 
-        dataframe.loc[
-            (
-                    (dataframe['high'] < dataframe['vwap']) &
-                    (dataframe['wt1'] < 0) &
-                    (dataframe['wt2'] < 0) &
-                    (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
+        # dataframe.loc[
+        #     (
+        #             (dataframe['high'] < dataframe['vwap']) &
+        #             (dataframe['wt1'] < 0) &
+        #             (dataframe['wt2'] < 0) &
+        #             (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
+        #
+        #             # Volume not 0
+        #             (dataframe['volume'] > 0)
+        #     ),
+        #     ['enter_long', 'enter_tag']] = (1, 'buy_signal')
 
-                    # Volume not 0
-                    (dataframe['volume'] > 0)
-            ),
-            ['enter_long', 'enter_tag']] = (1, 'buy_signal')
+        ########################### START HYPEROPT ###########################
+        conditions = []
+
+        if not self.buy_above_vwap.value:
+            conditions.append(dataframe['high'] < dataframe['vwap'])
+
+        if self.buy_us_market_hours.value:
+            conditions.append(dataframe['time'] >= '13:30')
+            conditions.append(dataframe['time'] <= '20:00')
+
+        if self.buy_only_weekdays.value:
+            conditions.append(dataframe['day_of_week'] != 'Saturday')
+            conditions.append(dataframe['day_of_week'] != 'Sunday')
+
+
+        conditions.append((dataframe['volume'] > 0))
+
+        if conditions:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions),
+                'enter_long'] = 1
+        ########################### END HYPEROPT ###########################
 
         return dataframe
 
     def custom_exit(self, pair: str, trade: Trade, current_time: datetime, current_rate: float,
                     current_profit: float, **kwargs):
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
-        sl_tp_ratio = 2
-        sell_condition = current_rate >= (trade.open_rate + sl_tp_ratio *(trade.open_rate - trade.stop_loss))
+        sl_tp_ratio = self.buy_tp_sl_ratio.value
+        sell_condition = current_rate >= (trade.open_rate + sl_tp_ratio * (trade.open_rate - trade.stop_loss))
         if trade.enter_tag == 'buy_signal' and sell_condition:
             return 'sell_signal'
         return None
-
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
@@ -239,9 +261,6 @@ class Bb(IStrategy):
         return dataframe
 
     # Support methods
-
-
-
 
     def custom_session(self, df: DataFrame, start, end):
         """
@@ -298,8 +317,5 @@ class Bb(IStrategy):
                                (df['time'] == '00:20'), 1, 0)
         df['cumsum'] = df['reset'].cumsum()
         df['support'] = df.groupby('cumsum')['low'].transform('min')
-        with pd.option_context('display.max_rows', None, 'display.max_columns',
-                               None):  # more options can be specified also
-            print(df)
-        return df
 
+        return df

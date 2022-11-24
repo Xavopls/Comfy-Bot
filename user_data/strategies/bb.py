@@ -232,11 +232,10 @@ class Bb(IStrategy):
             conditions.append(dataframe['day_of_week'] != 'Saturday')
             conditions.append(dataframe['day_of_week'] != 'Sunday')
 
-
         if conditions:
             dataframe.loc[
                 reduce(lambda x, y: x & y, conditions),
-                'enter_long', 'enter_tag'] = (1, 'buy_signal')
+                ['enter_long', 'enter_tag']] = (1, 'buy_signal')
         ########################### END HYPEROPT ###########################
 
         return dataframe

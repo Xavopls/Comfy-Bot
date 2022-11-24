@@ -213,6 +213,14 @@ class Bb(IStrategy):
         ########################### START HYPEROPT ###########################
         conditions = []
 
+        conditions.append(dataframe['wt1'] < 0)
+        conditions.append(dataframe['wt2'] < 0)
+        conditions.append(qtpylib.crossed_above(dataframe['close'], dataframe['ema12']))
+        conditions.append((dataframe['volume'] > 0))
+
+        # Volume not 0
+        conditions.append(dataframe['volume'] > 0)
+
         if not self.buy_above_vwap.value:
             conditions.append(dataframe['high'] < dataframe['vwap'])
 
@@ -225,12 +233,10 @@ class Bb(IStrategy):
             conditions.append(dataframe['day_of_week'] != 'Sunday')
 
 
-        conditions.append((dataframe['volume'] > 0))
-
         if conditions:
             dataframe.loc[
                 reduce(lambda x, y: x & y, conditions),
-                'enter_long'] = 1
+                'enter_long', 'enter_tag'] = (1, 'buy_signal')
         ########################### END HYPEROPT ###########################
 
         return dataframe
@@ -305,7 +311,6 @@ class Bb(IStrategy):
         return res
 
     def create_supports(self, df, reset_time):
-
         # Hardcoded... Sorry.
         df['reset'] = np.where((df['time'] == '01:00') |
                                (df['time'] == '04:20') |

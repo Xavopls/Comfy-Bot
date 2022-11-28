@@ -1,4 +1,8 @@
 # ToDo:
+# Trailing stop, check: ( last candle volume, candle type, candle volatility)
+# Check: Elder's triple screen trading system
+# Gather data from sp500 on freqtrade's https://www.freqtrade.io/en/stable/strategy-callbacks/#bot-loop-start
+
 
 # pragma pylint: disable=missing-docstring, invalid-name, pointless-string-statement
 # flake8: noqa: F401
@@ -12,6 +16,7 @@ from pandas import DataFrame, notnull
 import time
 from freqtrade.strategy import (BooleanParameter, CategoricalParameter, DecimalParameter,
                                 IStrategy, IntParameter, informative, merge_informative_pair)
+from typing import Optional
 
 # --------------------------------
 # Add your lib to import here
@@ -60,8 +65,6 @@ class Bb(IStrategy):
     ignore_roi_if_entry_signal = False
 
     # Hyperoptable parameters
-    # todo: change vwap session start time to 13:30 utc
-    buy_above_vwap = BooleanParameter(default=False, space="buy", optimize=True)
     buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
     buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
     buy_tp_sl_ratio = DecimalParameter(low=1.0, high=3.0, decimals=1,
@@ -103,6 +106,7 @@ class Bb(IStrategy):
             'wt': {
                 'wt1': {'color': 'red'},
                 'wt2': {'color': 'blue'},
+                'zero': {'color': 'black'},
             },
             'RSI': {
                 'rsi': {'color': 'purple'},
@@ -155,7 +159,7 @@ class Bb(IStrategy):
         dataframe['day_of_week'] = dataframe['date'].dt.day_name()
         dataframe['wt1'] = ta.EMA(ci, 12)
         dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
-
+        dataframe['zero'] = 0
         return dataframe
 
     def custom_stoploss(self, pair: str, trade: 'Trade', current_time: datetime,
@@ -185,10 +189,36 @@ class Bb(IStrategy):
         if not trade_candle.empty:
             trade_candle = trade_candle.squeeze()
             stoploss_price = trade_candle['support']
-            stoploss_price = stoploss_price * self.sell_support_margin_percentage.value
             if stoploss_price < current_rate:
                 return (stoploss_price / current_rate) - 1
         return 1
+
+    def custom_stake_amount(self, pair: str, current_time: datetime, current_rate: float,
+                            proposed_stake: float, min_stake: Optional[float], max_stake: float,
+                            leverage: float, entry_tag: Optional[str], side: str,
+                            **kwargs) -> float:
+
+        dataframe, _ = self.dp.get_analyzed_dataframe(pair=pair, timeframe=self.timeframe)
+        current_candle = dataframe.iloc[-1].squeeze()
+
+        sl_percentage = (current_rate / current_candle['support'] - 1) * 100
+
+        # Case where SL < 1%. We can't leverage, so we can't reach 1% atm.
+        sized_stake = proposed_stake
+
+        # Max drawdown = 1%
+        if sl_percentage >= 1:
+            sized_stake = proposed_stake / sl_percentage
+
+
+
+        return sized_stake
+        #
+        # print('rate', current_rate)
+        # print('supp', current_candle['support'])
+        #
+        # # Use default stake amount.
+        # return proposed_stake
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
@@ -198,44 +228,44 @@ class Bb(IStrategy):
         :return: DataFrame with entry columns populated
         """
 
-        # dataframe.loc[
-        #     (
-        #             (dataframe['high'] < dataframe['vwap']) &
-        #             (dataframe['wt1'] < 0) &
-        #             (dataframe['wt2'] < 0) &
-        #             (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
-        #
-        #             # Volume not 0
-        #             (dataframe['volume'] > 0)
-        #     ),
-        #     ['enter_long', 'enter_tag']] = (1, 'buy_signal')
+        dataframe.loc[
+            (
+                    # (dataframe['high'] < dataframe['vwap']) &
+                    (dataframe['wt1'] < 0) &
+                    (dataframe['wt2'] < 0) &
+                    (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
+
+                    # Volume not 0
+                    (dataframe['volume'] > 0)
+            ),
+            ['enter_long', 'enter_tag']] = (1, 'buy_signal')
 
         ########################### START HYPEROPT ###########################
-        conditions = []
-
-        conditions.append(dataframe['wt1'] < 0)
-        conditions.append(dataframe['wt2'] < 0)
-        conditions.append(qtpylib.crossed_above(dataframe['close'], dataframe['ema12']))
-        conditions.append((dataframe['volume'] > 0))
-
-        # Volume not 0
-        conditions.append(dataframe['volume'] > 0)
-
-        if not self.buy_above_vwap.value:
-            conditions.append(dataframe['high'] < dataframe['vwap'])
-
-        if self.buy_us_market_hours.value:
-            conditions.append(dataframe['time'] >= '13:30')
-            conditions.append(dataframe['time'] <= '20:00')
-
-        if self.buy_only_weekdays.value:
-            conditions.append(dataframe['day_of_week'] != 'Saturday')
-            conditions.append(dataframe['day_of_week'] != 'Sunday')
-
-        if conditions:
-            dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                ['enter_long', 'enter_tag']] = (1, 'buy_signal')
+        # conditions = []
+        #
+        # conditions.append(dataframe['wt1'] < 0)
+        # conditions.append(dataframe['wt2'] < 0)
+        # conditions.append(qtpylib.crossed_above(dataframe['close'], dataframe['ema12']))
+        # conditions.append((dataframe['volume'] > 0))
+        #
+        # # Volume not 0
+        # conditions.append(dataframe['volume'] > 0)
+        #
+        # if not self.buy_above_vwap.value:
+        #     conditions.append(dataframe['high'] < dataframe['vwap'])
+        #
+        # if self.buy_us_market_hours.value:
+        #     conditions.append(dataframe['time'] >= '13:30')
+        #     conditions.append(dataframe['time'] <= '20:00')
+        #
+        # if self.buy_only_weekdays.value:
+        #     conditions.append(dataframe['day_of_week'] != 'Saturday')
+        #     conditions.append(dataframe['day_of_week'] != 'Sunday')
+        #
+        # if conditions:
+        #     dataframe.loc[
+        #         reduce(lambda x, y: x & y, conditions),
+        #         ['enter_long', 'enter_tag']] = (1, 'buy_signal')
         ########################### END HYPEROPT ###########################
 
         return dataframe
@@ -243,7 +273,7 @@ class Bb(IStrategy):
     def custom_exit(self, pair: str, trade: Trade, current_time: datetime, current_rate: float,
                     current_profit: float, **kwargs):
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
-        sl_tp_ratio = self.buy_tp_sl_ratio.value
+        sl_tp_ratio = 2
         sell_condition = current_rate >= (trade.open_rate + sl_tp_ratio * (trade.open_rate - trade.stop_loss))
         if trade.enter_tag == 'buy_signal' and sell_condition:
             return 'sell_signal'

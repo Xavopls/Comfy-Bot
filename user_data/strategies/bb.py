@@ -46,6 +46,7 @@ class Bb(IStrategy):
     # Optimal stoploss designed for the strategy.
     # This attribute will be overridden if the config file contains "stoploss".
     use_custom_stoploss = True
+    position_adjustment_enable = True
 
     # Trailing stoploss
     # trailing_stop = True
@@ -193,6 +194,49 @@ class Bb(IStrategy):
                 return (stoploss_price / current_rate) - 1
         return 1
 
+    def adjust_trade_position(self, trade: Trade, current_time: datetime,
+                              current_rate: float, current_profit: float,
+                              min_stake: Optional[float], max_stake: float,
+                              current_entry_rate: float, current_exit_rate: float,
+                              current_entry_profit: float, current_exit_profit: float,
+                              **kwargs) -> Optional[float]:
+        """
+        Custom trade adjustment logic, returning the stake amount that a trade should be
+        increased or decreased.
+        This means extra buy or sell orders with additional fees.
+        Only called when `position_adjustment_enable` is set to True.
+
+        For full documentation please go to https://www.freqtrade.io/en/latest/strategy-advanced/
+
+        When not implemented by a strategy, returns None
+
+        :param trade: trade object.
+        :param current_time: datetime object, containing the current datetime
+        :param current_rate: Current buy rate.
+        :param current_profit: Current profit (as ratio), calculated based on current_rate.
+        :param min_stake: Minimal stake size allowed by exchange (for both entries and exits)
+        :param max_stake: Maximum stake allowed (either through balance, or by exchange limits).
+        :param current_entry_rate: Current rate using entry pricing.
+        :param current_exit_rate: Current rate using exit pricing.
+        :param current_entry_profit: Current profit using entry pricing.
+        :param current_exit_profit: Current profit using exit pricing.
+        :param **kwargs: Ensure to keep this here so updates to this won't break your strategy.
+        :return float: Stake amount to adjust your trade,
+                       Positive values to increase position, Negative values to decrease position.
+                       Return None for no action.
+        """
+        # SL / TP ratio to resize the position
+        resize_position_ratio = 1.5
+
+        # Price to resize
+        resize_position_rate = (trade.open_rate + resize_position_ratio * (trade.open_rate - trade.stop_loss))
+
+        if current_rate >= resize_position_rate and trade.nr_of_successful_exits == 0:
+            # Take half of the profit at 1:1.5
+            return -(trade.stake_amount / 2)
+
+        return None
+
     def custom_stake_amount(self, pair: str, current_time: datetime, current_rate: float,
                             proposed_stake: float, min_stake: Optional[float], max_stake: float,
                             leverage: float, entry_tag: Optional[str], side: str,
@@ -210,15 +254,7 @@ class Bb(IStrategy):
         if sl_percentage >= 1:
             sized_stake = proposed_stake / sl_percentage
 
-
-
         return sized_stake
-        #
-        # print('rate', current_rate)
-        # print('supp', current_candle['support'])
-        #
-        # # Use default stake amount.
-        # return proposed_stake
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """

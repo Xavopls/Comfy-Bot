@@ -68,15 +68,40 @@ class Bb(IStrategy):
     # Hyperoptable parameters
     buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
     buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
-    buy_tp_sl_ratio = DecimalParameter(low=1.0, high=3.0, decimals=1,
-                                       default=2.0, space='buy', optimize=True, load=True)
+    buy_vwap_option = CategoricalParameter(["above", "below", "no"], default="no", space="buy")
 
-    sell_support_margin_percentage = DecimalParameter(low=0.92, high=1.00, decimals=2,
-                                                      default=1.0, space='sell', optimize=True, load=True)
+    sell_support_margin_percentage = DecimalParameter(low=0.99, high=1.00, decimals=3,
+                                                      default=1.0, space='sell', optimize=True)
+    sell_partial_exit_ratio = DecimalParameter(low=0.5, high=1.5, decimals=1,
+                                               default=1.5, space='sell', optimize=True)
+    sell_exit_ratio = DecimalParameter(low=1.6, high=3, decimals=1,
+                                       default=2, space='sell', optimize=True)
+
+    cooldown_lookback = IntParameter(24, 60, default=5, space="protection", optimize=True)
+    sl_guard_trade_limit = IntParameter(1, 5, default=2, space="protection", optimize=True)
+    sl_guard_lookback_hours = IntParameter(1, 8, default=2, space="protection", optimize=True)
+    sl_guard_stop_duration = IntParameter(12, 200, default=5, space="protection", optimize=True)
+    sl_guard_use = BooleanParameter(default=True, space="protection", optimize=True)
+
 
     @property
     def protections(self):
         prot = []
+
+        ########## Hyperopt ##########
+        prot.append({
+            "method": "CooldownPeriod",
+            "stop_duration_candles": self.cooldown_lookback.value
+        })
+        if self.sl_guard_use.value:
+            prot.append({
+                "method": "StoplossGuard",
+                "lookback_period_candles": 12 * self.sl_guard_lookback_hours.value,
+                "trade_limit": self.sl_guard_trade_limit.value,
+                "stop_duration_candles": self.sl_guard_stop_duration.value,
+                "only_per_pair": False
+            })
+        ########## Hyperopt ##########
         return prot
 
     # Number of candles the strategy requires before producing valid signals
@@ -137,7 +162,7 @@ class Bb(IStrategy):
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """
-        Adds several different TA indicators to the given DataFrame
+        Adds different TA indicators to the given DataFrame
 
         Performance Note: For the best performance be frugal on the number of indicators
         you are using. Let uncomment only the indicator you are using in your strategies
@@ -149,7 +174,7 @@ class Bb(IStrategy):
 
         # dataframe = self.custom_session(dataframe, start='09:30', end='16:00')
         dataframe['vwap'] = self.custom_vwap(dataframe, '01:00')
-        dataframe = self.create_supports(dataframe, '01:00')
+        dataframe = self.create_supports(dataframe)
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
         dataframe['ema200'] = ta.EMA(dataframe, timeperiod=200)
@@ -189,7 +214,8 @@ class Bb(IStrategy):
         trade_candle = dataframe.loc[dataframe['date'] == trade_date]
         if not trade_candle.empty:
             trade_candle = trade_candle.squeeze()
-            stoploss_price = trade_candle['support']
+            stoploss_price = trade_candle['support'] * self.sell_support_margin_percentage.value  # Hyperopt
+            # stoploss_price = trade_candle['support']
             if stoploss_price < current_rate:
                 return (stoploss_price / current_rate) - 1
         return 1
@@ -226,8 +252,8 @@ class Bb(IStrategy):
                        Return None for no action.
         """
         # SL / TP ratio to resize the position
-        resize_position_ratio = 1.5
-
+        # resize_position_ratio = 1.5
+        resize_position_ratio = self.sell_partial_exit_ratio.value  # Hyperopt
         # Price to resize
         resize_position_rate = (trade.open_rate + resize_position_ratio * (trade.open_rate - trade.stop_loss))
 
@@ -264,52 +290,57 @@ class Bb(IStrategy):
         :return: DataFrame with entry columns populated
         """
 
-        dataframe.loc[
-            (
-                    # (dataframe['high'] < dataframe['vwap']) &
-                    (dataframe['wt1'] < 0) &
-                    (dataframe['wt2'] < 0) &
-                    (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
-
-                    # Volume not 0
-                    (dataframe['volume'] > 0)
-            ),
-            ['enter_long', 'enter_tag']] = (1, 'buy_signal')
+        # dataframe.loc[
+        #     (
+        #             # (dataframe['high'] < dataframe['vwap']) &
+        #             (dataframe['wt1'] < 0) &
+        #             (dataframe['wt2'] < 0) &
+        #             (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
+        #
+        #             # Volume not 0
+        #             (dataframe['volume'] > 0)
+        #     ),
+        #     ['enter_long', 'enter_tag']] = (1, 'buy_signal')
 
         ########################### START HYPEROPT ###########################
-        # conditions = []
-        #
-        # conditions.append(dataframe['wt1'] < 0)
-        # conditions.append(dataframe['wt2'] < 0)
-        # conditions.append(qtpylib.crossed_above(dataframe['close'], dataframe['ema12']))
-        # conditions.append((dataframe['volume'] > 0))
-        #
-        # # Volume not 0
-        # conditions.append(dataframe['volume'] > 0)
-        #
-        # if not self.buy_above_vwap.value:
-        #     conditions.append(dataframe['high'] < dataframe['vwap'])
-        #
-        # if self.buy_us_market_hours.value:
-        #     conditions.append(dataframe['time'] >= '13:30')
-        #     conditions.append(dataframe['time'] <= '20:00')
-        #
-        # if self.buy_only_weekdays.value:
-        #     conditions.append(dataframe['day_of_week'] != 'Saturday')
-        #     conditions.append(dataframe['day_of_week'] != 'Sunday')
-        #
-        # if conditions:
-        #     dataframe.loc[
-        #         reduce(lambda x, y: x & y, conditions),
-        #         ['enter_long', 'enter_tag']] = (1, 'buy_signal')
+        conditions = []
+
+        conditions.append(dataframe['wt1'] < 0)
+        conditions.append(dataframe['wt2'] < 0)
+        conditions.append(qtpylib.crossed_above(dataframe['close'], dataframe['ema12']))
+        conditions.append((dataframe['volume'] > 0))
+
+        # Volume not 0
+        conditions.append(dataframe['volume'] > 0)
+
+        if self.buy_vwap_option.value == 'above':
+            conditions.append(dataframe['hlc3'] > dataframe['vwap'])
+
+        if self.buy_vwap_option.value == 'below':
+            conditions.append(dataframe['hlc3'] < dataframe['vwap'])
+
+        if self.buy_us_market_hours.value:
+            conditions.append(dataframe['time'] >= '13:30')
+            conditions.append(dataframe['time'] <= '20:00')
+
+        if self.buy_only_weekdays.value:
+            conditions.append(dataframe['day_of_week'] != 'Saturday')
+            conditions.append(dataframe['day_of_week'] != 'Sunday')
+
+        if conditions:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions),
+                ['enter_long', 'enter_tag']] = (1, 'buy_signal')
         ########################### END HYPEROPT ###########################
 
         return dataframe
 
     def custom_exit(self, pair: str, trade: Trade, current_time: datetime, current_rate: float,
                     current_profit: float, **kwargs):
+
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
-        sl_tp_ratio = 2
+        # sl_tp_ratio = 2
+        sl_tp_ratio = self.sell_exit_ratio.value  # Hyperopt
         sell_condition = current_rate >= (trade.open_rate + sl_tp_ratio * (trade.open_rate - trade.stop_loss))
         if trade.enter_tag == 'buy_signal' and sell_condition:
             return 'sell_signal'
@@ -375,7 +406,7 @@ class Bb(IStrategy):
         res = df.groupby(df['cumsum'])['tmp_data'].cumsum()
         return res
 
-    def create_supports(self, df, reset_time):
+    def create_supports(self, df):
         # Hardcoded... Sorry.
         df['reset'] = np.where((df['time'] == '01:00') |
                                (df['time'] == '04:20') |
@@ -389,3 +420,10 @@ class Bb(IStrategy):
         df['support'] = df.groupby('cumsum')['low'].transform('min')
 
         return df
+
+    def percentage(self, num1, num2):
+        if num1 == num2:
+            return 0
+        elif num1 < num2:
+            num1, num2 = num2, num1
+        return (num1 / num2 - 1) * 100

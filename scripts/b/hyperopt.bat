@@ -1,1 +1,1 @@
-freqtrade hyperopt --config user_data/config_test.json --timerange 20210101-20221122 --hyperopt-loss ShortTradeDurHyperOptLoss  --strategy Bb -e 1000 --spaces buy sell
+freqtrade hyperopt --config user_data/config_test.json --timerange 20201101-20221128 --hyperopt-loss ShortTradeDurHyperOptLoss  --strategy Bb -e 2000 --spaces buy sell trailing protection

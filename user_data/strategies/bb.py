@@ -35,12 +35,12 @@ class Bb(IStrategy):
 
     # Can this strategy go short?
     can_short: bool = False
-    stoploss = -0.1
+    stoploss = -0.9
 
     # Minimal ROI designed for the strategy.
     # This attribute will be overridden if the config file contains "minimal_roi".
     minimal_roi = {
-        "0": 0.30,
+        "0": 0.90,
     }
 
     # Optimal stoploss designed for the strategy.
@@ -49,10 +49,10 @@ class Bb(IStrategy):
     position_adjustment_enable = True
 
     # Trailing stoploss
-    # trailing_stop = True
-    # trailing_stop_positive = 0.231
-    # trailing_stop_positive_offset = 0.286
-    # trailing_only_offset_is_reached = False
+    trailing_stop = True,
+    trailing_stop_positive = 0.086,
+    trailing_stop_positive_offset = 0.141,
+    trailing_only_offset_is_reached = True
 
     # Optimal timeframe for the strategy.
     timeframe = '5m'
@@ -66,42 +66,51 @@ class Bb(IStrategy):
     ignore_roi_if_entry_signal = False
 
     # Hyperoptable parameters
-    buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
-    buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
-    buy_vwap_option = CategoricalParameter(["above", "below", "no"], default="no", space="buy")
+    # buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
+    # buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
+    # buy_vwap_option = CategoricalParameter(["above", "below", "no"], default="no", space="buy")
+    #
+    # sell_support_margin_percentage = DecimalParameter(low=0.99, high=1.00, decimals=3,
+    #                                                   default=1.0, space='sell', optimize=True)
+    # sell_partial_exit_ratio = DecimalParameter(low=0.5, high=1.5, decimals=1,
+    #                                            default=1.5, space='sell', optimize=True)
+    # sell_exit_ratio = DecimalParameter(low=1.6, high=3, decimals=1,
+    #                                    default=2, space='sell', optimize=True)
+    #
+    # cooldown_lookback = IntParameter(24, 60, default=5, space="protection", optimize=True)
+    # sl_guard_trade_limit = IntParameter(1, 5, default=2, space="protection", optimize=True)
+    # sl_guard_lookback_hours = IntParameter(1, 8, default=2, space="protection", optimize=True)
+    # sl_guard_stop_duration = IntParameter(12, 200, default=5, space="protection", optimize=True)
+    # sl_guard_use = BooleanParameter(default=True, space="protection", optimize=True)
 
-    sell_support_margin_percentage = DecimalParameter(low=0.99, high=1.00, decimals=3,
-                                                      default=1.0, space='sell', optimize=True)
-    sell_partial_exit_ratio = DecimalParameter(low=0.5, high=1.5, decimals=1,
-                                               default=1.5, space='sell', optimize=True)
-    sell_exit_ratio = DecimalParameter(low=1.6, high=3, decimals=1,
-                                       default=2, space='sell', optimize=True)
-
-    cooldown_lookback = IntParameter(24, 60, default=5, space="protection", optimize=True)
-    sl_guard_trade_limit = IntParameter(1, 5, default=2, space="protection", optimize=True)
-    sl_guard_lookback_hours = IntParameter(1, 8, default=2, space="protection", optimize=True)
-    sl_guard_stop_duration = IntParameter(12, 200, default=5, space="protection", optimize=True)
-    sl_guard_use = BooleanParameter(default=True, space="protection", optimize=True)
-
+    buy_us_market_hours = True
+    buy_only_weekdays = True
+    buy_vwap_option = 'below'
+    sell_support_margin_percentage = 0.992
+    sell_partial_exit_ratio = 1
+    sell_exit_ratio = 3
+    cooldown_lookback = 41
+    sl_guard_trade_limit = 1
+    sl_guard_lookback_hours = 1
+    sl_guard_stop_duration = 153
+    sl_guard_use = True
 
     @property
     def protections(self):
         prot = []
 
-        ########## Hyperopt ##########
         prot.append({
             "method": "CooldownPeriod",
-            "stop_duration_candles": self.cooldown_lookback.value
+            "stop_duration_candles": self.cooldown_lookback
         })
-        if self.sl_guard_use.value:
+        if self.sl_guard_use:
             prot.append({
                 "method": "StoplossGuard",
-                "lookback_period_candles": 12 * self.sl_guard_lookback_hours.value,
-                "trade_limit": self.sl_guard_trade_limit.value,
-                "stop_duration_candles": self.sl_guard_stop_duration.value,
+                "lookback_period_candles": 12 * self.sl_guard_lookback_hours,
+                "trade_limit": self.sl_guard_trade_limit,
+                "stop_duration_candles": self.sl_guard_stop_duration,
                 "only_per_pair": False
             })
-        ########## Hyperopt ##########
         return prot
 
     # Number of candles the strategy requires before producing valid signals
@@ -214,7 +223,7 @@ class Bb(IStrategy):
         trade_candle = dataframe.loc[dataframe['date'] == trade_date]
         if not trade_candle.empty:
             trade_candle = trade_candle.squeeze()
-            stoploss_price = trade_candle['support'] * self.sell_support_margin_percentage.value  # Hyperopt
+            stoploss_price = trade_candle['support'] * self.sell_support_margin_percentage  # Hyperopt
             # stoploss_price = trade_candle['support']
             if stoploss_price < current_rate:
                 return (stoploss_price / current_rate) - 1
@@ -253,7 +262,7 @@ class Bb(IStrategy):
         """
         # SL / TP ratio to resize the position
         # resize_position_ratio = 1.5
-        resize_position_ratio = self.sell_partial_exit_ratio.value  # Hyperopt
+        resize_position_ratio = self.sell_partial_exit_ratio  # Hyperopt
         # Price to resize
         resize_position_rate = (trade.open_rate + resize_position_ratio * (trade.open_rate - trade.stop_loss))
 
@@ -313,17 +322,17 @@ class Bb(IStrategy):
         # Volume not 0
         conditions.append(dataframe['volume'] > 0)
 
-        if self.buy_vwap_option.value == 'above':
+        if self.buy_vwap_option == 'above':
             conditions.append(dataframe['hlc3'] > dataframe['vwap'])
 
-        if self.buy_vwap_option.value == 'below':
+        if self.buy_vwap_option == 'below':
             conditions.append(dataframe['hlc3'] < dataframe['vwap'])
 
-        if self.buy_us_market_hours.value:
+        if self.buy_us_market_hours:
             conditions.append(dataframe['time'] >= '13:30')
             conditions.append(dataframe['time'] <= '20:00')
 
-        if self.buy_only_weekdays.value:
+        if self.buy_only_weekdays:
             conditions.append(dataframe['day_of_week'] != 'Saturday')
             conditions.append(dataframe['day_of_week'] != 'Sunday')
 
@@ -340,7 +349,7 @@ class Bb(IStrategy):
 
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
         # sl_tp_ratio = 2
-        sl_tp_ratio = self.sell_exit_ratio.value  # Hyperopt
+        sl_tp_ratio = self.sell_exit_ratio  # Hyperopt
         sell_condition = current_rate >= (trade.open_rate + sl_tp_ratio * (trade.open_rate - trade.stop_loss))
         if trade.enter_tag == 'buy_signal' and sell_condition:
             return 'sell_signal'

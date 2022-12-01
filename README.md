@@ -4,7 +4,7 @@ Comfy is a crypto algo trading bot based on [freqtrade](https://www.freqtrade.io
 
 ## Documentation
 I invite you to read the bot documentation to ensure you understand how the bot is working if you are willing to use it.  
-Please find the complete documentation on the [freqtrade offical site](https://www.freqtrade.io).
+Please find the complete documentation on the [freqtrade official site](https://www.freqtrade.io).
 
 
 ## Disclaimer

@@ -298,20 +298,6 @@ class Bb(IStrategy):
         :param metadata: Additional information, like the currently traded pair
         :return: DataFrame with entry columns populated
         """
-
-        # dataframe.loc[
-        #     (
-        #             # (dataframe['high'] < dataframe['vwap']) &
-        #             (dataframe['wt1'] < 0) &
-        #             (dataframe['wt2'] < 0) &
-        #             (qtpylib.crossed_above(dataframe['close'], dataframe['ema12'])) &
-        #
-        #             # Volume not 0
-        #             (dataframe['volume'] > 0)
-        #     ),
-        #     ['enter_long', 'enter_tag']] = (1, 'buy_signal')
-
-        ########################### START HYPEROPT ###########################
         conditions = []
 
         conditions.append(dataframe['wt1'] < 0)

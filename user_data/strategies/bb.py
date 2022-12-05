@@ -20,6 +20,7 @@ from typing import Optional
 
 # --------------------------------
 # Add your lib to import here
+import utils.strategy_utils as utils
 import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 from datetime import datetime, timedelta, time
@@ -181,9 +182,8 @@ class Bb(IStrategy):
         :return: a Dataframe with all mandatory indicators for the strategies
         """
 
-        # dataframe = self.custom_session(dataframe, start='09:30', end='16:00')
-        dataframe['vwap'] = self.custom_vwap(dataframe, '01:00')
-        dataframe = self.create_supports(dataframe)
+        dataframe['vwap'] = utils.custom_vwap(dataframe, '01:00')
+        dataframe = utils.create_supports(dataframe)
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
         dataframe['ema200'] = ta.EMA(dataframe, timeperiod=200)
@@ -356,69 +356,3 @@ class Bb(IStrategy):
             ['exit_long', 'exit_tag']] = (1, 'exit_1')
 
         return dataframe
-
-    # Support methods
-
-    def custom_session(self, df: DataFrame, start, end):
-        """
-        :param df: DataFrame
-        :param start: String
-        :param end: String
-        remove previous globex day from df
-
-        """
-        df['time'] = df['date'].dt.strftime('%H:%M')
-        df['volume_session'] = np.where((df['time'] <= start) | (df['time'] >= end), 0, df['volume'])
-        df['high_session'] = np.where((df['time'] <= start) | (df['time'] >= end), 0, df['high'])
-        df['close_session'] = np.where((df['time'] <= start) | (df['time'] >= end), 0, df['close'])
-        df['low_session'] = np.where((df['time'] <= start) | (df['time'] >= end), 0, df['low'])
-        df['open_session'] = np.where((df['time'] <= start) | (df['time'] >= end), 0, df['open'])
-
-        return df.copy()
-
-    def custom_vwap(self, df, reset_time):
-        df['time'] = df['date'].dt.strftime('%H:%M')
-        df['reset_time'] = np.where((df['time'] == time), 1, 0)
-
-        typical = ((df['high'] + df['low'] + df['close']) / 3).values
-        volume = df['volume'].values
-
-        tpv = self.reset_cumsum(df=df, serie=(typical * volume), reset_time=reset_time)
-        cum_vol = self.reset_cumsum(df=df, serie=volume, reset_time=reset_time)
-
-        return pd.Series(index=df.index,
-                         data=tpv / cum_vol)
-
-    def reset_cumsum(self, df, serie, reset_time):
-        """
-        Given a serie and a df, it cumsums it and resets the sum at the given time.
-        Returns a serie.
-        """
-        df['tmp_data'] = serie
-        time = df['date'].dt.strftime('%H:%M')
-        df['reset_time'] = np.where((time == reset_time), 1, 0)
-        df['cumsum'] = df['reset_time'].cumsum()
-        res = df.groupby(df['cumsum'])['tmp_data'].cumsum()
-        return res
-
-    def create_supports(self, df):
-        # Hardcoded... Sorry.
-        df['reset'] = np.where((df['time'] == '01:00') |
-                               (df['time'] == '04:20') |
-                               (df['time'] == '07:40') |
-                               (df['time'] == '11:00') |
-                               (df['time'] == '14:20') |
-                               (df['time'] == '17:40') |
-                               (df['time'] == '21:00') |
-                               (df['time'] == '00:20'), 1, 0)
-        df['cumsum'] = df['reset'].cumsum()
-        df['support'] = df.groupby('cumsum')['low'].transform('min')
-
-        return df
-
-    def percentage(self, num1, num2):
-        if num1 == num2:
-            return 0
-        elif num1 < num2:
-            num1, num2 = num2, num1
-        return (num1 / num2 - 1) * 100

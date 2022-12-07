@@ -1,1 +1,6 @@
-freqtrade hyperopt --config user_data/config_test.json --timerange 20210101-20221122 --hyperopt-loss ShortTradeDurHyperOptLoss  --strategy Bb -e 2000 --spaces buy sell trailing protection --disable-param-export
+TIME_START=20201101
+TIME_FINISH=20221129
+TIMEFRAME=30m
+
+freqtrade download-data --timerange $TIME_START-$TIME_FINISH --timeframes $TIMEFRAME --exchange binance --config user_data/config_scotty.json
+freqtrade hyperopt --config user_data/config_scotty.json --timerange $TIME_START-$TIME_FINISH --hyperopt-loss SharpeHyperOptLoss --strategy Scotty -e 1000 --spaces buy sell

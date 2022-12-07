@@ -16,7 +16,6 @@ from typing import Optional
 
 # --------------------------------
 # Add your lib to import here
-import utils.strategy_utils as utils
 import talib.abstract as ta
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 from datetime import datetime, timedelta, time
@@ -46,7 +45,7 @@ class Scotty(IStrategy):
     position_adjustment_enable = True
 
     # Optimal timeframe for the strategy.
-    timeframe = '1m'
+    timeframe = '30m'
 
     # Run "populate_indicators()" only for new candle.
     process_only_new_candles = True
@@ -57,18 +56,26 @@ class Scotty(IStrategy):
     ignore_roi_if_entry_signal = False
 
     # Hyperoptable parameters
-    # buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
-    # buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
-    # buy_vwap_option = CategoricalParameter(["above", "below", "no"], default="no", space="buy")
-    #
-    # sell_support_margin_percentage = DecimalParameter(low=0.99, high=1.00, decimals=3,
-    #                                                   default=1.0, space='sell', optimize=True)
-    # sell_partial_exit_ratio = DecimalParameter(low=0.5, high=1.5, decimals=1,
-    #                                            default=1.5, space='sell', optimize=True)
-    # sell_exit_ratio = DecimalParameter(low=1.6, high=3, decimals=1,
-    #                                    default=2, space='sell', optimize=True)
+    buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_rsi_growing = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_rsi_max = IntParameter(low=51, high=99, default=51, space='buy', optimize=True)
+    buy_rsi_min = IntParameter(low=1, high=50, default=1, space='buy', optimize=True)
+    buy_stoch_max = IntParameter(low=51, high=99, default=10, space='buy', optimize=True)
+    buy_stoch_min = IntParameter(low=1, high=50, default=90, space='buy', optimize=True)
 
+    sell_resize_position = BooleanParameter(default=True, space="sell", optimize=True)
 
+    sell_resize_position_ratio = DecimalParameter(low=0.5, high=2, decimals=1,
+                                                  default=1.5, space='sell', optimize=True)
+
+    sell_resize_profit_amount = DecimalParameter(low=1.5, high=3, decimals=1,
+                                                 default=1.5, space='sell', optimize=True)
+
+    sell_support_margin_percentage = DecimalParameter(low=0.95, high=1.00, decimals=2,
+                                                      default=1.0, space='sell', optimize=True)
+    sell_exit_ratio = DecimalParameter(low=1.6, high=3, decimals=1,
+                                       default=2, space='sell', optimize=True)
 
     @property
     def protections(self):
@@ -147,16 +154,12 @@ class Scotty(IStrategy):
         dataframe['bb_upperband'] = bollinger['upper']
         dataframe['bb_width_percentage'] = ((dataframe['bb_lowerband'] / dataframe['bb_upperband']) - 1) * -100
 
-        # # Stochastic Slow
-        stoch = ta.STOCH(dataframe)
-
         # Stochastic Fast
         stoch_fast = ta.STOCHF(dataframe)
         dataframe['fastd'] = stoch_fast['fastd']
         dataframe['fastk'] = stoch_fast['fastk']
 
-        dataframe['vwap'] = utils.custom_vwap(dataframe, '01:00')
-        dataframe = utils.create_supports(dataframe)
+        dataframe = self.create_supports(dataframe)
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
         dataframe['ema200'] = ta.EMA(dataframe, timeperiod=200)
@@ -168,8 +171,6 @@ class Scotty(IStrategy):
         dataframe['wt1'] = ta.EMA(ci, 12)
         dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
         dataframe['zero'] = 0
-
-
 
         return dataframe
 
@@ -199,8 +200,7 @@ class Scotty(IStrategy):
         trade_candle = dataframe.loc[dataframe['date'] == trade_date]
         if not trade_candle.empty:
             trade_candle = trade_candle.squeeze()
-            stoploss_price = trade_candle['support']   # Hyperopt
-            # stoploss_price = trade_candle['support']
+            stoploss_price = trade_candle['support'] * self.sell_support_margin_percentage.value
             if stoploss_price < current_rate:
                 return (stoploss_price / current_rate) - 1
         return 1
@@ -237,14 +237,13 @@ class Scotty(IStrategy):
                        Return None for no action.
         """
         # SL / TP ratio to resize the position
-        resize_position_ratio = 1.5
-        # resize_position_ratio = self.sell_partial_exit_ratio  # Hyperopt
-        # Price to resize
-        resize_position_rate = (trade.open_rate + resize_position_ratio * (trade.open_rate - trade.stop_loss))
+        if self.sell_resize_position.value:
+            # Price to resize
+            resize_position_rate = (
+                        trade.open_rate + self.sell_resize_position_ratio.value * (trade.open_rate - trade.stop_loss))
 
-        if current_rate >= resize_position_rate and trade.nr_of_successful_exits == 0:
-            # Take half of the profit at 1:1.5
-            return -(trade.stake_amount / 2)
+            if current_rate >= resize_position_rate and trade.nr_of_successful_exits == 0:
+                return -(trade.stake_amount / self.sell_resize_profit_amount.value)
 
         return None
 
@@ -258,7 +257,7 @@ class Scotty(IStrategy):
 
         sl_percentage = (current_rate / current_candle['support'] - 1) * 100
 
-        # Case where SL < 1%. We can't leverage, so we can't reach 1% atm.
+        # Case where SL < 1%. We can't leverage, so we can't reach 1%.
         sized_stake = proposed_stake
 
         # Max drawdown = 1%
@@ -277,17 +276,28 @@ class Scotty(IStrategy):
         conditions = []
 
         conditions.append(qtpylib.crossed_above(dataframe['high'], dataframe['bb_upperband']))
-        conditions.append((dataframe['volume'] > 0))
-        conditions.append((dataframe['rsi'] > 65))
-        conditions.append((dataframe['fastk'] > 80))
+
+        # Stochastic
+        conditions.append(dataframe['fastk'] > self.buy_stoch_min.value)
+        conditions.append(dataframe['fastk'] < self.buy_stoch_max.value)
+
+        # RSI range
+        conditions.append(dataframe['rsi'] > self.buy_rsi_min.value)
+        conditions.append(dataframe['rsi'] < self.buy_rsi_max.value)
+
+        # RSI growing
+        if self.buy_rsi_growing.value:
+            conditions.append(dataframe['rsi'].shift(1) < dataframe['rsi'])
 
         # US Market timeframe
-        conditions.append(dataframe['time'] >= '13:30')
-        conditions.append(dataframe['time'] <= '20:00')
+        if self.buy_us_market_hours.value:
+            conditions.append(dataframe['time'] >= '13:30')
+            conditions.append(dataframe['time'] <= '20:00')
 
         # No trading on weekends
-        conditions.append(dataframe['day_of_week'] != 'Saturday')
-        conditions.append(dataframe['day_of_week'] != 'Sunday')
+        if self.buy_only_weekdays.value:
+            conditions.append(dataframe['day_of_week'] != 'Saturday')
+            conditions.append(dataframe['day_of_week'] != 'Sunday')
 
         # Volume not 0
         conditions.append(dataframe['volume'] > 0)
@@ -326,3 +336,19 @@ class Scotty(IStrategy):
             ['exit_long', 'exit_tag']] = (1, 'exit_1')
 
         return dataframe
+
+    def create_supports(self, df):
+        # Hardcoded... Sorry.
+        df['time'] = df['date'].dt.strftime('%H:%M')
+        df['reset'] = np.where((df['time'] == '01:00') |
+                               (df['time'] == '04:20') |
+                               (df['time'] == '07:40') |
+                               (df['time'] == '11:00') |
+                               (df['time'] == '14:20') |
+                               (df['time'] == '17:40') |
+                               (df['time'] == '21:00') |
+                               (df['time'] == '00:20'), 1, 0)
+        df['cumsum'] = df['reset'].cumsum()
+        df['support'] = df.groupby('cumsum')['low'].transform('min')
+
+        return df

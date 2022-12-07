@@ -4,6 +4,7 @@ import pandas as pd
 
 def create_supports(df):
     # Hardcoded... Sorry.
+    df['time'] = df['date'].dt.strftime('%H:%M')
     df['reset'] = np.where((df['time'] == '01:00') |
                            (df['time'] == '04:20') |
                            (df['time'] == '07:40') |

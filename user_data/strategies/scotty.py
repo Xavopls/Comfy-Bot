@@ -50,6 +50,12 @@ class Scotty(IStrategy):
     # Run "populate_indicators()" only for new candle.
     process_only_new_candles = True
 
+    # Trailing stop:
+    trailing_stop = True
+    trailing_stop_positive = 0.348
+    trailing_stop_positive_offset = 0.371
+    trailing_only_offset_is_reached = True
+
     # These values can be overridden in the config.
     use_exit_signal = True
     exit_profit_only = False

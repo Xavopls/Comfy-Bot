@@ -140,7 +140,7 @@ class Scotty(IStrategy):
         # informative_pairs = [(pair, '5m') for pair in pairs]
         # informative_pairs = [("ETH/USDT", "5m")]
 
-        # return informative_pairs
+        return []
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         """

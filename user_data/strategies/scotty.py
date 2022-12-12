@@ -51,7 +51,7 @@ class Scotty(IStrategy):
     process_only_new_candles = True
 
     # Trailing stop:
-    trailing_stop = True
+    trailing_stop = False
     trailing_stop_positive = 0.348
     trailing_stop_positive_offset = 0.371
     trailing_only_offset_is_reached = True
@@ -62,26 +62,26 @@ class Scotty(IStrategy):
     ignore_roi_if_entry_signal = False
 
     # Hyperoptable parameters
-    buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=False)
-    buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=False)
-    buy_rsi_growing = BooleanParameter(default=False, space="buy", optimize=False)
-    buy_rsi_max = IntParameter(low=51, high=99, default=51, space='buy', optimize=False)
-    buy_rsi_min = IntParameter(low=1, high=50, default=1, space='buy', optimize=False)
-    buy_stoch_max = IntParameter(low=51, high=99, default=10, space='buy', optimize=False)
-    buy_stoch_min = IntParameter(low=1, high=50, default=90, space='buy', optimize=False)
+    buy_us_market_hours = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_only_weekdays = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_rsi_growing = BooleanParameter(default=False, space="buy", optimize=True)
+    buy_rsi_max = IntParameter(low=51, high=99, default=51, space='buy', optimize=True)
+    buy_rsi_min = IntParameter(low=1, high=50, default=1, space='buy', optimize=True)
+    buy_stoch_max = IntParameter(low=51, high=99, default=10, space='buy', optimize=True)
+    buy_stoch_min = IntParameter(low=1, high=50, default=90, space='buy', optimize=True)
 
-    sell_resize_position = BooleanParameter(default=True, space="sell", optimize=False)
+    sell_resize_position = BooleanParameter(default=True, space="sell", optimize=True)
 
     sell_resize_position_ratio = DecimalParameter(low=0.5, high=2, decimals=1,
-                                                  default=1.5, space='sell', optimize=False)
+                                                  default=1.5, space='sell', optimize=True)
 
     sell_resize_profit_amount = DecimalParameter(low=1.5, high=3, decimals=1,
-                                                 default=1.5, space='sell', optimize=False)
+                                                 default=1.5, space='sell', optimize=True)
 
     sell_support_margin_percentage = DecimalParameter(low=0.95, high=1.00, decimals=2,
-                                                      default=1.0, space='sell', optimize=False)
+                                                      default=1.0, space='sell', optimize=True)
     sell_exit_ratio = DecimalParameter(low=1.6, high=3, decimals=1,
-                                       default=2, space='sell', optimize=False)
+                                       default=2, space='sell', optimize=True)
 
     @property
     def protections(self):

@@ -89,7 +89,7 @@ class Scotty(IStrategy):
         return prot
 
     # Number of candles the strategy requires before producing valid signals
-    startup_candle_count: int = 240
+    startup_candle_count: int = 10
 
     # Optional order type mapping.
     order_types = {

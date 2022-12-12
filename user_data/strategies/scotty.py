@@ -93,8 +93,8 @@ class Scotty(IStrategy):
 
     # Optional order type mapping.
     order_types = {
-        'entry': 'market',
-        'exit': 'market',
+        'entry': 'limit',
+        'exit': 'limit',
         'stoploss': 'market',
         'stoploss_on_exchange': False
     }

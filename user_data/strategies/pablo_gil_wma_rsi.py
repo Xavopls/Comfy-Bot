@@ -153,7 +153,7 @@ class PabloGilWmaRsi(IStrategy):
         :param metadata: Additional information, like the currently traded pair
         :return: a Dataframe with all mandatory indicators for the strategies
         """
-
+        dataframe['day_of_week'] = dataframe['date'].dt.day_name()
         dataframe['wma14'] = ta.WMA(dataframe, timeperiod=14)
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe = self.create_supports(dataframe)

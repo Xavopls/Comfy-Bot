@@ -1,0 +1,8 @@
+numpy
+pandas
+ccxt
+python-rapidjson
+keyboard
+rich
+psutil
+pyyaml

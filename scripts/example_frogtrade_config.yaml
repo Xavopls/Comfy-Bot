@@ -1,0 +1,42 @@
+---
+servers:
+    - name        : "bot1_live"
+      username    : "user"
+      password    : "pass"
+      ip          : 192.168.1.69
+      port        : 8081
+    - name        : "bot2_dry"
+      username    : "user"
+      password    : "pass"
+      ip          : 1.2.3.4
+      port        : 8081
+
+stake_coin: "USDT"
+informative_coin: "BTC"
+
+basic_symbols: False
+exclude_charts: False
+include_sysinfo: True
+include_candle_info: False
+verbose: False
+
+side_panel_minimum_size: 107
+num_days_daily: 5
+num_closed_trades: 3
+
+indicators:
+    - colname     : "rsi"
+      headername  : "RSI"
+      round_val   : 0
+    - colname     : "bb_middleband"
+      headername  : "BBM"
+      round_val   : 3
+    - colname     : "bb_upperband"
+      headername  : "BBU"
+      round_val   : 3
+    - colname     : "ema_50"
+      headername  : "E50"
+      round_val   : 4
+    - colname     : "ema_200"
+      headername  : "E200"
+      round_val   : 4

@@ -4,7 +4,7 @@ config*.json
 *.sqlite-shm
 *.sqlite-wal
 logfile.txt
-
+scripts/frogtrade_config.yaml
 user_data/config.json
 user_data/config_test.json
 user_data/config_prod.json

@@ -24,7 +24,7 @@ from freqtrade.exchange import timeframe_to_prev_date
 
 
 # This class is a sample. Feel free to customize it.
-class Pablito(IStrategy):
+class PabloGilWmaRsi(IStrategy):
     # Strategy interface version - allow new iterations of the strategy interface.
     # Check the documentation or the Sample strategy to get the latest version.
     INTERFACE_VERSION = 3

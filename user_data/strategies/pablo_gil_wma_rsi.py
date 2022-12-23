@@ -45,7 +45,7 @@ class PabloGilWmaRsi(IStrategy):
     position_adjustment_enable = True
 
     # Optimal timeframe for the strategy.
-    timeframe = '30m'
+    timeframe = '5m'
 
     # Run "populate_indicators()" only for new candle.
     process_only_new_candles = True
@@ -110,6 +110,7 @@ class PabloGilWmaRsi(IStrategy):
         'main_plot': {
             'vwap': {'color': 'yellow'},
             'support': {'color': 'purple'},
+            'resistance': {'color': 'purple'},
         },
         'subplots': {
             'stoch_fast': {
@@ -157,6 +158,7 @@ class PabloGilWmaRsi(IStrategy):
         dataframe['wma14'] = ta.WMA(dataframe, timeperiod=14)
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
         dataframe = self.create_supports(dataframe)
+        dataframe = self.create_resistances(dataframe)
 
         return dataframe
 
@@ -259,33 +261,34 @@ class PabloGilWmaRsi(IStrategy):
         :param metadata: Additional information, like the currently traded pair
         :return: DataFrame with entry columns populated
         """
-        conditions = []
+        conditions_long = []
+        conditions_short = []
 
-        conditions.append((dataframe['wma14']).shift(1) < dataframe['wma14'])
+        conditions_long.append((dataframe['wma14']).shift(1) < dataframe['wma14'])
 
         if self.buy_wma_grow_older.value:
-            conditions.append((dataframe['wma14']).shift(2) < dataframe['wma14'].shift(1))
+            conditions_long.append((dataframe['wma14']).shift(2) < dataframe['wma14'].shift(1))
 
         if self.buy_rsi_lookback_candles.value == 2:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value))
             )
         if self.buy_rsi_lookback_candles.value == 3:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(3), self.buy_rsi_value.value))
             )
         if self.buy_rsi_lookback_candles.value == 4:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(3), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(4), self.buy_rsi_value.value))
             )
         if self.buy_rsi_lookback_candles.value == 5:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value)) |
                 (qtpylib.crossed_above(dataframe['rsi'].shift(3), self.buy_rsi_value.value)) |
@@ -295,21 +298,58 @@ class PabloGilWmaRsi(IStrategy):
 
         # US Market timeframe
         if self.buy_us_market_hours.value:
-            conditions.append(dataframe['time'] >= '13:30')
-            conditions.append(dataframe['time'] <= '20:00')
+            conditions_long.append(dataframe['time'] >= '13:30')
+            conditions_long.append(dataframe['time'] <= '20:00')
 
         # No trading on weekends
         if self.buy_only_weekdays.value:
-            conditions.append(dataframe['day_of_week'] != 'Saturday')
-            conditions.append(dataframe['day_of_week'] != 'Sunday')
+            conditions_long.append(dataframe['day_of_week'] != 'Saturday')
+            conditions_long.append(dataframe['day_of_week'] != 'Sunday')
 
         # Volume not 0
-        conditions.append(dataframe['volume'] > 0)
+        conditions_long.append(dataframe['volume'] > 0)
 
-        if conditions:
+        if conditions_long:
             dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
-                ['enter_long', 'enter_tag']] = (1, 'buy_signal')
+                reduce(lambda x, y: x & y, conditions_long),
+                ['enter_long', 'enter_tag']] = (1, 'long_signal')
+
+        conditions_short.append((dataframe['wma14']).shift(1) > dataframe['wma14'])
+
+        if self.sell_wma_grow_older.value:
+            conditions_short.append((dataframe['wma14']).shift(2) > dataframe['wma14'].shift(1))
+
+        if self.sell_rsi_lookback_candles.value == 2:
+            conditions_short.append(
+                (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value))
+            )
+        if self.sell_rsi_lookback_candles.value == 3:
+            conditions_short.append(
+                (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(3), self.sell_rsi_value.value))
+            )
+        if self.sell_rsi_lookback_candles.value == 4:
+            conditions_short.append(
+                (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(3), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(4), self.sell_rsi_value.value))
+            )
+        if self.sell_rsi_lookback_candles.value == 5:
+            conditions_short.append(
+                (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(3), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(4), self.sell_rsi_value.value)) |
+                (qtpylib.crossed_below(dataframe['rsi'].shift(5), self.sell_rsi_value.value))
+            )
+
+        if conditions_short:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions_short),
+                ['enter_short', 'enter_tag']] = (1, 'short_signal')
 
         return dataframe
 
@@ -332,33 +372,34 @@ class PabloGilWmaRsi(IStrategy):
         :return: DataFrame with exit columns populated
         """
 
-        conditions = []
+        conditions_long = []
+        conditions_short = []
 
-        conditions.append((dataframe['wma14']).shift(1) > dataframe['wma14'])
+        conditions_long.append((dataframe['wma14']).shift(1) > dataframe['wma14'])
 
         if self.sell_wma_grow_older.value:
-            conditions.append((dataframe['wma14']).shift(2) > dataframe['wma14'].shift(1))
+            conditions_long.append((dataframe['wma14']).shift(2) > dataframe['wma14'].shift(1))
 
         if self.sell_rsi_lookback_candles.value == 2:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value))
             )
         if self.sell_rsi_lookback_candles.value == 3:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(3), self.sell_rsi_value.value))
             )
         if self.sell_rsi_lookback_candles.value == 4:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(3), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(4), self.sell_rsi_value.value))
             )
         if self.sell_rsi_lookback_candles.value == 5:
-            conditions.append(
+            conditions_long.append(
                 (qtpylib.crossed_below(dataframe['rsi'].shift(1), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(2), self.sell_rsi_value.value)) |
                 (qtpylib.crossed_below(dataframe['rsi'].shift(3), self.sell_rsi_value.value)) |
@@ -366,10 +407,60 @@ class PabloGilWmaRsi(IStrategy):
                 (qtpylib.crossed_below(dataframe['rsi'].shift(5), self.sell_rsi_value.value))
             )
 
-        if conditions:
+        if conditions_long:
             dataframe.loc[
-                reduce(lambda x, y: x & y, conditions),
+                reduce(lambda x, y: x & y, conditions_long),
                 ['exit_long', 'exit_tag']] = (1, 'exit_signal')
+
+        conditions_short.append((dataframe['wma14']).shift(1) < dataframe['wma14'])
+
+        if self.buy_wma_grow_older.value:
+            conditions_short.append((dataframe['wma14']).shift(2) < dataframe['wma14'].shift(1))
+
+        if self.buy_rsi_lookback_candles.value == 2:
+            conditions_short.append(
+                (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value))
+            )
+        if self.buy_rsi_lookback_candles.value == 3:
+            conditions_short.append(
+                (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(3), self.buy_rsi_value.value))
+            )
+        if self.buy_rsi_lookback_candles.value == 4:
+            conditions_short.append(
+                (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(3), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(4), self.buy_rsi_value.value))
+            )
+        if self.buy_rsi_lookback_candles.value == 5:
+            conditions_short.append(
+                (qtpylib.crossed_above(dataframe['rsi'].shift(1), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(2), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(3), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(4), self.buy_rsi_value.value)) |
+                (qtpylib.crossed_above(dataframe['rsi'].shift(5), self.buy_rsi_value.value))
+            )
+
+        # US Market timeframe
+        if self.buy_us_market_hours.value:
+            conditions_short.append(dataframe['time'] >= '13:30')
+            conditions_short.append(dataframe['time'] <= '20:00')
+
+        # No trading on weekends
+        if self.buy_only_weekdays.value:
+            conditions_short.append(dataframe['day_of_week'] != 'Saturday')
+            conditions_short.append(dataframe['day_of_week'] != 'Sunday')
+
+        # Volume not 0
+        conditions_short.append(dataframe['volume'] > 0)
+
+        if conditions_short:
+            dataframe.loc[
+                reduce(lambda x, y: x & y, conditions_short),
+                ['exit_short', 'exit_tag']] = (1, 'exit_short_signal')
 
         return dataframe
 
@@ -386,5 +477,21 @@ class PabloGilWmaRsi(IStrategy):
                                (df['time'] == '00:20'), 1, 0)
         df['cumsum'] = df['reset'].cumsum()
         df['support'] = df.groupby('cumsum')['low'].transform('min')
+
+        return df
+
+    def create_resistances(self, df):
+        # Hardcoded... Sorry.
+        df['time'] = df['date'].dt.strftime('%H:%M')
+        df['reset'] = np.where((df['time'] == '01:00') |
+                               (df['time'] == '04:20') |
+                               (df['time'] == '07:40') |
+                               (df['time'] == '11:00') |
+                               (df['time'] == '14:20') |
+                               (df['time'] == '17:40') |
+                               (df['time'] == '21:00') |
+                               (df['time'] == '00:20'), 1, 0)
+        df['cumsum'] = df['reset'].cumsum()
+        df['resistance'] = df.groupby('cumsum')['high'].transform('max')
 
         return df

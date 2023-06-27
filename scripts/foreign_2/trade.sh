@@ -1,1 +1,0 @@
-freqtrade trade --config user_data/config_prod_foreign_2.json --strategy Foreign2

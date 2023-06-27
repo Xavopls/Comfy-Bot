@@ -1,1 +1,0 @@
-freqtrade hyperopt --config user_data/config_test.json --timerange 20221025-20221030 --hyperopt-loss OnlyProfitHyperOptLoss --strategy Moisture -e 1000 --spaces buy stoploss

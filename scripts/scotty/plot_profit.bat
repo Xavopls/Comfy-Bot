@@ -1,1 +1,0 @@
-plot-profit --strategy Scotty --timeframe 30m --timerange 20201101-20221129 --export-filename user_data/backtest_results/backtest-result-2022-12-09_13-31-42.json --config .\user_data\config_scotty.json

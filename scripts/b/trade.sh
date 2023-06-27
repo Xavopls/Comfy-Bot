@@ -1,1 +1,0 @@
-freqtrade trade --config user_data/config_prod.json --strategy Moisture

@@ -1,13 +1,15 @@
 Rem Overall config
 set strategy=Scotty
-set time_start=20220701
-set time_finish=20220801
+set time_start=20210101
+set time_finish=20230627
+
+
 set timeframes=30m
 set config_test=config_backtest.json
 set config_prod=config_backtest.json
 
 Rem Hyperopt Config 
-set hyperopt_reps=10
+set hyperopt_reps=5
 set hyperopt_spaces=buy sell
 set hyperopt_loss=SharpeHyperOptLoss
 

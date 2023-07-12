@@ -69,15 +69,13 @@ class Scotty(IStrategy):
     buy_rsi_min = IntParameter(low=1, high=50, default=1, space='buy', optimize=True)
     buy_stoch_max = IntParameter(low=51, high=99, default=10, space='buy', optimize=True)
     buy_stoch_min = IntParameter(low=1, high=50, default=90, space='buy', optimize=True)
+    buy_bullish_candle =  BooleanParameter(default=False, space="buy", optimize=True)
 
     sell_resize_position = BooleanParameter(default=True, space="sell", optimize=True)
-
     sell_resize_position_ratio = DecimalParameter(low=0.5, high=2, decimals=1,
                                                   default=1.5, space='sell', optimize=True)
-
     sell_resize_profit_amount = DecimalParameter(low=1.5, high=3, decimals=1,
                                                  default=1.5, space='sell', optimize=True)
-
     sell_support_margin_percentage = DecimalParameter(low=0.95, high=1.00, decimals=2,
                                                       default=1.0, space='sell', optimize=True)
     sell_exit_ratio = DecimalParameter(low=1.6, high=3, decimals=1,
@@ -162,20 +160,20 @@ class Scotty(IStrategy):
 
         # Stochastic Fast
         stoch_fast = ta.STOCHF(dataframe)
-        dataframe['fastd'] = stoch_fast['fastd']
+        # dataframe['fastd'] = stoch_fast['fastd']
         dataframe['fastk'] = stoch_fast['fastk']
 
         dataframe = self.create_supports(dataframe)
         dataframe['rsi'] = ta.RSI(dataframe, timeperiod=14)
-        dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
-        dataframe['ema200'] = ta.EMA(dataframe, timeperiod=200)
-        dataframe['hlc3'] = (dataframe['high'] + dataframe['low'] + dataframe['close']) / 3
-        esa = ta.EMA(dataframe['hlc3'], 9)
-        de = ta.EMA(abs(dataframe['hlc3'] - esa), 9)
-        ci = (dataframe['hlc3'] - esa) / (0.015 * de)
+        # dataframe['ema12'] = ta.EMA(dataframe, timeperiod=12)
+        # dataframe['ema200'] = ta.EMA(dataframe, timeperiod=200)
+        # dataframe['hlc3'] = (dataframe['high'] + dataframe['low'] + dataframe['close']) / 3
+        # esa = ta.EMA(dataframe['hlc3'], 9)
+        # de = ta.EMA(abs(dataframe['hlc3'] - esa), 9)
+        # ci = (dataframe['hlc3'] - esa) / (0.015 * de)
         dataframe['day_of_week'] = dataframe['date'].dt.day_name()
-        dataframe['wt1'] = ta.EMA(ci, 12)
-        dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
+        # dataframe['wt1'] = ta.EMA(ci, 12)
+        # dataframe['wt2'] = ta.SMA(dataframe['wt1'], 3)
         dataframe['zero'] = 0
 
         return dataframe
@@ -281,6 +279,7 @@ class Scotty(IStrategy):
         """
         conditions = []
 
+        # BB
         conditions.append(qtpylib.crossed_above(dataframe['high'], dataframe['bb_upperband']))
 
         # Stochastic
@@ -300,7 +299,11 @@ class Scotty(IStrategy):
             conditions.append(dataframe['time'] >= '13:30')
             conditions.append(dataframe['time'] <= '20:00')
 
-        # No trading on weekends
+        # Bullish candle
+        if self.buy_bullish_candle.value:
+            conditions.append(dataframe['open'] < dataframe['close'])
+
+        # Trading on weekends
         if self.buy_only_weekdays.value:
             conditions.append(dataframe['day_of_week'] != 'Saturday')
             conditions.append(dataframe['day_of_week'] != 'Sunday')
@@ -312,7 +315,6 @@ class Scotty(IStrategy):
             dataframe.loc[
                 reduce(lambda x, y: x & y, conditions),
                 ['enter_long', 'enter_tag']] = (1, 'buy_signal')
-        ########################### END HYPEROPT ###########################
 
         return dataframe
 
@@ -320,8 +322,7 @@ class Scotty(IStrategy):
                     current_profit: float, **kwargs):
 
         dataframe, _ = self.dp.get_analyzed_dataframe(pair, self.timeframe)
-        sl_tp_ratio = 2
-        # sl_tp_ratio = self.sell_exit_ratio  # Hyperopt
+        sl_tp_ratio = self.sell_exit_ratio.value  # Hyperopt
         sell_condition = current_rate >= (trade.open_rate + sl_tp_ratio * (trade.open_rate - trade.stop_loss))
         if trade.enter_tag == 'buy_signal' and sell_condition:
             return 'sell_signal'
